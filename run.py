@@ -19,7 +19,7 @@ def init_processors():
     asr = ASRProcessor()
 
 
-output_mode = "audio"
+output_mode = "voice"
 markup = ReplyKeyboardMarkup( [["audio", "text", "voice"]], one_time_keyboard=True)
 
 
@@ -125,19 +125,17 @@ if __name__ == '__main__':
     start_handler = CommandHandler('start', start)
     reset_handler = CommandHandler('reset', reset)
     save_handler = CommandHandler('save', save)
-
   
     message_handler = MessageHandler(filters.TEXT & (~filters.COMMAND), message)
     voice_handler = MessageHandler(filters.VOICE, audio)
     audio_handler = MessageHandler(filters.AUDIO | filters.VIDEO | filters.VIDEO_NOTE | filters.ATTACHMENT, audio)
-    
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("set_output", set_output)],
         states={0: [MessageHandler(filters.Regex("^(audio|text|voice)$"), regular_choice),],},
         fallbacks=[MessageHandler(filters.Regex("^Done$"), done)],
     )
-    application.add_handler(conv_handler)
 
+    application.add_handler(conv_handler)
     application.add_handler(start_handler)
     application.add_handler(reset_handler)
     application.add_handler(save_handler)
