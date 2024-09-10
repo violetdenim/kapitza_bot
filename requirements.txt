@@ -1,0 +1,21 @@
+# system cuda 12.1
+# conda create -n kap_env python=3.11 && conda activate kap_env && pip install -r requirements.txt
+flash_attn
+torch
+torchaudio
+python-dotenv
+python-telegram-bot
+gitpython
+runorm
+####
+llama-index
+llama-index-embeddings-huggingface
+--extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu121
+llama-cpp-python
+llama-index-llms-llama_cpp
+####
+TTS
+pyannote.audio
+accelerate
+
+
