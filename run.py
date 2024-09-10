@@ -18,10 +18,8 @@ def init_processors():
     tts = TTSProcessor(os.environ.get("AUDIO_PATH"))
     asr = ASRProcessor()
 
-
 output_mode = "voice"
 markup = ReplyKeyboardMarkup( [["audio", "text", "voice"]], one_time_keyboard=True)
-
 
 def get_name(update: Update):
     user_name = update.message.from_user.first_name
@@ -46,9 +44,9 @@ async def save(update: Update, context: ContextTypes.DEFAULT_TYPE):
     llm.save_context(user_name)
     await context.bot.send_message(chat_id=update.effective_chat.id, text=f"Контекст для {user_name} сохранён.")
 
-async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def message(update: Update, context: ContextTypes.DEFAULT_TYPE, override_message=None):
     global output_mode
-    answer = llm.process_prompt(update.message.text, get_name(update))
+    answer = llm.process_prompt(override_message if override_message is not None else update.message.text, get_name(update))
     
     if output_mode == "text":
         await context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
@@ -86,19 +84,10 @@ async def audio(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(user_message) == 0:
         await context.bot.send_message(chat_id=update.effective_chat.id, text="Прошу прощения, не расслышал.")
         return
-    await context.bot.send_message(chat_id=update.effective_chat.id, text="Расшифровал сообщение:" + user_message)
-    answer = llm.process_prompt(user_message, get_name(update))
-    await context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
+    # await context.bot.send_message(chat_id=update.effective_chat.id, text="Расшифровал сообщение:" + user_message)
+    print("Расшифровал сообщение:" + user_message)
 
-    if output_mode == "text":
-        await context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
-    else:
-        audio_name = tts.get_audio(answer, format=".wav" if output_mode == "audio" else ".ogg")
-        if output_mode == "audio":
-            await context.bot.send_audio(chat_id=update.effective_chat.id, audio=open(audio_name, 'rb'))
-        else:
-            await context.bot.send_voice(chat_id=update.effective_chat.id, voice=open(audio_name, 'rb'))
-        os.remove(audio_name)
+    await message(update, context, user_message)
 
 
 async def set_output(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:

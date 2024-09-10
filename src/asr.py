@@ -1,8 +1,7 @@
-
 from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
 from pyannote.audio import Model as VADModel
 from pyannote.audio.pipelines import VoiceActivityDetection
-import torch
+import torch, torchaudio
 
 class ASRProcessor:
     def __init__(self, model_id = "openai/whisper-large-v3") -> None:
@@ -43,9 +42,6 @@ class ASRProcessor:
         parts = self.vad_pipeline({"waveform": voice, "sample_rate": rate})
         text = ""
         for segment, track, label in parts.itertracks(yield_label=True):
-            print(segment, track, label)
             text += self.pipe(voice[0, int(segment.start*rate):int(segment.end*rate)].numpy().flatten())["text"]
             text += '\n' # end of sentence
-
-        # text = self.pipe(voice.numpy().flatten())["text"]
         return text
