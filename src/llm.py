@@ -1,48 +1,26 @@
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Settings
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-from llama_index.llms.ollama import Ollama
-from llama_index.llms.huggingface import HuggingFaceLLM
-from transformers import BitsAndBytesConfig
-
 from llama_index.core.storage.chat_store import SimpleChatStore
 from llama_index.core.memory import ChatMemoryBuffer
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.llms.llama_cpp import LlamaCPP
-from llama_index.llms.llama_cpp.llama_utils import (
-    messages_to_prompt,
-    completion_to_prompt,
-)
+from llama_index.llms.llama_cpp.llama_utils import ( messages_to_prompt_v3_instruct, completion_to_prompt_v3_instruct)
 
-from runorm import RUNorm
 from src.utils import *
 import os
-
-normalizer = RUNorm()
-normalizer.load(model_size="big", device="cpu")
-
-llamaguard_pack = None
-# from llama_index.core.llama_pack import download_llama_pack
-# os.environ["HUGGINGFACE_ACCESS_TOKEN"] = "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"
-# LlamaGuardModeratorPack = download_llama_pack("LlamaGuardModeratorPack", "./llamaguard_pack")
-# llamaguard_pack = LlamaGuardModeratorPack()
-
-from llama_index.llms.llama_cpp.llama_utils import (
-    messages_to_prompt_v3_instruct,
-    completion_to_prompt_v3_instruct,
-)
+# tool to normalize model's output
+from runorm import RUNorm
 
 class LLMProcessor:
-    def __init__(self, prompt_path, rag_folder):
+    def __init__(self, prompt_path, rag_folder,
+                 embedding_name='BAAI/bge-m3',# 'deepvk/USER-bge-m3' #'intfloat/multilingual-e5-large-instruct' #"BAAI/bge-base-en-v1.5"
+                 model_url="https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf?download=true",
+                 use_llama_guard=False
+                 ):
         documents = SimpleDirectoryReader(rag_folder, recursive=True).load_data()#"data"
-        
-        embedding_name='BAAI/bge-m3'
-        #'deepvk/USER-bge-m3' 
-        #'intfloat/multilingual-e5-large-instruct'
-        #"BAAI/bge-base-en-v1.5"
-
         Settings.embed_model = HuggingFaceEmbedding(model_name=embedding_name)
         Settings.llm = LlamaCPP(
             # You can pass in the URL to a GGML model to download it automatically
-            model_url="https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf?download=true",
+            model_url=model_url,
             # optionally, you can set the path to a pre-downloaded model instead of model_url
             model_path=None, #"kap_model/unsloth.Q4_K_M.gguf",
             temperature=0.05,
@@ -60,13 +38,20 @@ class LLMProcessor:
         )
         
         self.index = VectorStoreIndex.from_documents(documents)
-        
         self.chat_store = None
         self.chat_engine = None
         self.current_user = None
         self.prompt = None
         self.prompt_path = prompt_path
-        self.postprocessing_fn = lambda x: normalizer.norm(drop_ending(strip_substr(x, ['assistant', ' ', '\n'])))
+        self.normalizer = RUNorm()
+        self.normalizer.load(model_size="big", device="cpu")
+        self.postprocessing_fn = lambda x: self.normalizer.norm(drop_ending(strip_substr(x, ['assistant', ' ', '\n'])))
+        if use_llama_guard:
+            from llama_index.core.llama_pack import download_llama_pack
+            LlamaGuardModeratorPack = download_llama_pack("LlamaGuardModeratorPack", "../llamaguard_pack")
+            self.llamaguard_pack = LlamaGuardModeratorPack()
+        else:
+            self.llamaguard_pack = None
 
     def get_system_prompt(self, user_name):
         if self.prompt is None:
@@ -102,11 +87,12 @@ class LLMProcessor:
                                                      system_prompt=self.get_system_prompt(user_name))
         self.current_user = user_name
         
+        
 
     def process_prompt(self, prompt, user_name):
         self.set_engine(user_name)
-        if llamaguard_pack:
-            moderator_response_for_input = llamaguard_pack.run(prompt)
+        if self.llamaguard_pack:
+            moderator_response_for_input = self.llamaguard_pack.run(prompt)
             print(f"moderator response for input: {moderator_response_for_input}")
 
             # Check if the moderator response for input is safe
@@ -114,10 +100,8 @@ class LLMProcessor:
                 response = self.chat_engine.chat(prompt) #query_engine.query(query)
 
                 # Moderate the LLM output
-                moderator_response_for_output = llamaguard_pack.run(str(response))
-                print(
-                    f"moderator response for output: {moderator_response_for_output}"
-                )
+                moderator_response_for_output = self.llamaguard_pack.run(str(response))
+                print(f"moderator response for output: {moderator_response_for_output}")
                 # Check if the moderator response for output is safe
                 if moderator_response_for_output != "safe":
                     response = None
@@ -128,6 +112,6 @@ class LLMProcessor:
                 return "Пожалуй, лучше поговорить на другую тему."
         else:
              response = self.chat_engine.chat(prompt)
-        # return normalizer.norm(drop_ending(strip_substr(response.response, ['assistant', ' ', '\n'])))
+        
         return self.postprocessing_fn(response.response)
   
