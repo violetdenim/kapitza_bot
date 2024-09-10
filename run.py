@@ -15,7 +15,7 @@ llm, tts, asr = None, None, None
 def init_processors():
     global llm, tts, asr
     llm = LLMProcessor(os.environ.get("PROMPT_PATH"), os.environ.get("RAG_PATH"))
-    tts = TTSProcessor()
+    tts = TTSProcessor(os.environ.get("AUDIO_PATH"))
     asr = ASRProcessor()
 
 

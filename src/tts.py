@@ -5,8 +5,7 @@ import tempfile
 from git import Repo
 
 class TTSProcessor:
-    def __init__(self, checkpoint_path = "../../kapitza_audio_model"):
-        # checkpoint_path = "/media/zipa/6C0CE7B5223C084C/TestCode2/xtts_finetune/v2/ready"
+    def __init__(self, checkpoint_path):
         if not os.path.exists(checkpoint_path):
             Repo.clone_from("https://huggingface.co/kzipa/kapitza_voice", checkpoint_path)
 
