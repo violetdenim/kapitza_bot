@@ -55,9 +55,8 @@ class LLMProcessor:
 
     def get_system_prompt(self, user_name):
         if self.prompt is None:
-            with open(self.prompt_path, "r") as f:
+            with open(self.prompt_path, "r", encoding='utf-8') as f:
                 self.prompt = '\n'.join(f.readlines())
-                print(self.prompt)
         return self.prompt
     
     def save_context(self, user_name):

@@ -6,17 +6,24 @@ from telegram.ext import ( ApplicationBuilder, CommandHandler, ContextTypes, Con
 from src.llm import LLMProcessor
 from src.tts import TTSProcessor
 from src.asr import ASRProcessor
+
   
 # load global variables from local .env file
 dotenv.load_dotenv()
+
 llm, tts, asr = None, None, None
 
 # globally accessed objects
 def init_processors():
     global llm, tts, asr
-    llm = LLMProcessor(os.environ.get("PROMPT_PATH"), os.environ.get("RAG_PATH"))
-    tts = TTSProcessor(os.environ.get("AUDIO_PATH"))
-    asr = ASRProcessor()
+    # model_url = "https://huggingface.co/QuantFactory/Meta-Llama-3.1-8B-GGUF/resolve/main/Meta-Llama-3.1-8B.Q4_K_M.gguf?download=true"
+    model_url = f"https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf?download=true"
+    asr = ASRProcessor(hf_token=os.environ.get('HF_AUTH'))
+    llm = LLMProcessor(os.environ.get("PROMPT_PATH"),
+                       os.environ.get("RAG_PATH"),
+                       model_url=model_url)
+    tts = TTSProcessor(os.environ.get("AUDIO_PATH"), hf_token=os.environ.get('HF_AUTH'))
+    
 
 output_mode = "voice"
 markup = ReplyKeyboardMarkup( [["audio", "text", "voice"]], one_time_keyboard=True)
@@ -61,6 +68,7 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE, override_m
 async def audio(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global output_mode
     print(f"Entered audio, got message {update.message}")
+    file_id = None
      # get basic info about the voice note file and prepare it for downloading
     if update.message.voice is not None:
         file_to_process = f"voice_note.ogg"
@@ -72,7 +80,8 @@ async def audio(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if update.message.document.mime_type == 'audio/x-wav':
             file_to_process = f"voice_note.wav"
             file_id = update.message.document.file_id
-
+    if file_id is None:
+        return # do nothing!
     print(f"Loading {file_id} to {file_to_process}")
     new_file = await context.bot.get_file(file_id)
     await new_file.download_to_drive(file_to_process)

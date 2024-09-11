@@ -7,6 +7,7 @@ python-dotenv
 python-telegram-bot
 gitpython
 runorm
+huggingface_hub
 ####
 llama-index
 llama-index-embeddings-huggingface

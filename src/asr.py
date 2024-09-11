@@ -1,10 +1,10 @@
 from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
 from pyannote.audio import Model as VADModel
 from pyannote.audio.pipelines import VoiceActivityDetection
-import torch, torchaudio
+import torch, torchaudio, os
 
 class ASRProcessor:
-    def __init__(self, model_id = "openai/whisper-large-v3") -> None:
+    def __init__(self, model_id="openai/whisper-large-v3", hf_token=os.environ.get('HF_AUTH')) -> None:
         device = "cuda:0" if torch.cuda.is_available() else "cpu"
         torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
         model = AutoModelForSpeechSeq2Seq.from_pretrained(
@@ -24,7 +24,7 @@ class ASRProcessor:
             device=device,
         )
 
-        model = VADModel.from_pretrained("pyannote/segmentation-3.0", use_auth_token="HUGGINGFACE_ACCESS_TOKEN_GOES_HERE")
+        model = VADModel.from_pretrained("pyannote/segmentation-3.0", use_auth_token=hf_token)
         self.vad_pipeline = VoiceActivityDetection(segmentation=model)
         HYPER_PARAMETERS = {
             # remove speech regions shorter than that many seconds.
