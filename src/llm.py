@@ -57,6 +57,8 @@ class LLMProcessor:
         if self.prompt is None:
             with open(self.prompt_path, "r", encoding='utf-8') as f:
                 self.prompt = '\n'.join(f.readlines())
+        self.prompt = self.prompt.replace("{user_name}", user_name)
+        print(self.prompt)
         return self.prompt
     
     def save_context(self, user_name):

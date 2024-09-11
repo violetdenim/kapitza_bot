@@ -29,6 +29,7 @@ output_mode = "voice"
 markup = ReplyKeyboardMarkup( [["audio", "text", "voice"]], one_time_keyboard=True)
 
 def get_name(update: Update):
+    print(update.message.from_user.first_name, update.message.from_user.username)
     user_name = update.message.from_user.first_name
     if len(user_name) == 0:
         user_name = update.message.from_user.username
