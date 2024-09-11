@@ -22,6 +22,7 @@ conda create -n kap_env python=3.11 && conda activate kap_env && pip install -r 
 docker build -t kszipa/kapitza-bot .
 docker push kszipa/kapitza-bot
 # pull docker container
+docker pull kszipa/kapitza-bot
 # run existing docker container
 docker run --rm --gpus all kszipa/kapitza-bot
 ```
