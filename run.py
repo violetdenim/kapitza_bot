@@ -3,27 +3,13 @@ import os, dotenv
 from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update
 from telegram.ext import ( ApplicationBuilder, CommandHandler, ContextTypes, ConversationHandler, MessageHandler, filters)
 
-from src.llm import LLMProcessor
-from src.tts import TTSProcessor
-from src.asr import ASRProcessor
+from pipeline import Pipeline
 
   
 # load global variables from local .env file
 dotenv.load_dotenv()
 
-llm, tts, asr = None, None, None
-
-# globally accessed objects
-def init_processors():
-    global llm, tts, asr
-    # model_url = "https://huggingface.co/QuantFactory/Meta-Llama-3.1-8B-GGUF/resolve/main/Meta-Llama-3.1-8B.Q4_K_M.gguf?download=true"
-    model_url = f"https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf?download=true"
-    asr = ASRProcessor(hf_token=os.environ.get('HF_AUTH'))
-    llm = LLMProcessor(os.environ.get("PROMPT_PATH"),
-                       os.environ.get("RAG_PATH"),
-                       model_url=model_url)
-    tts = TTSProcessor(os.environ.get("AUDIO_PATH"), hf_token=os.environ.get('HF_AUTH'))
-    
+pipe = Pipeline()
 
 output_mode = "voice"
 markup = ReplyKeyboardMarkup( [["audio", "text", "voice"]], one_time_keyboard=True)
@@ -39,27 +25,30 @@ def get_name(update: Update):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_name = get_name(update)
-    llm.set_engine(user_name)
+    pipe.set_user(user_name)
     await context.bot.send_message(chat_id=update.effective_chat.id, text=f"Здравствуйте, {user_name}. ")
 
 async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_name = get_name(update)
-    llm.set_engine(user_name, reset=True)
+    pipe.set_user(user_name)
     await context.bot.send_message(chat_id=update.effective_chat.id, text=f"Здравствуйте, {user_name}. ")
 
 async def save(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_name = get_name(update)
-    llm.save_context(user_name)
+    pipe.save_context(user_name)
     await context.bot.send_message(chat_id=update.effective_chat.id, text=f"Контекст для {user_name} сохранён.")
 
 async def message(update: Update, context: ContextTypes.DEFAULT_TYPE, override_message=None):
     global output_mode
-    answer = llm.process_prompt(override_message if override_message is not None else update.message.text, get_name(update))
+
+    answer = pipe.process(user_name=get_name(update),
+                 user_message=override_message if override_message is not None else update.message.text,
+                 output_mode=output_mode)
     
     if output_mode == "text":
         await context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
     else:
-        audio_name = tts.get_audio(answer, format=".wav" if output_mode == "audio" else ".ogg")
+        audio_name = answer
         if output_mode == "audio":
             await context.bot.send_audio(chat_id=update.effective_chat.id, audio=open(audio_name, 'rb'))
         else:
@@ -87,18 +76,22 @@ async def audio(update: Update, context: ContextTypes.DEFAULT_TYPE):
     new_file = await context.bot.get_file(file_id)
     await new_file.download_to_drive(file_to_process)
     print(f"Loaded {file_id} to {file_to_process}")
-    # decode audio message using whisper and pass it to llm
-    user_message = asr.get_text(file_to_process)
-    os.remove(file_to_process)
     
-    if len(user_message) == 0:
-        await context.bot.send_message(chat_id=update.effective_chat.id, text="Прошу прощения, не расслышал.")
-        return
-    # await context.bot.send_message(chat_id=update.effective_chat.id, text="Расшифровал сообщение:" + user_message)
-    print("Расшифровал сообщение:" + user_message)
+    result = pipe.process(user_name=get_name(update), file_to_process=file_to_process, output_mode=output_mode)
+    
+    os.remove(file_to_process)
 
-    await message(update, context, user_message)
-
+    if len(result) > 1:
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=result[1])
+    if output_mode == "text":
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=result)
+    else:
+        audio_name = result
+        if output_mode == "audio":
+            await context.bot.send_audio(chat_id=update.effective_chat.id, audio=open(audio_name, 'rb'))
+        else:
+            await context.bot.send_voice(chat_id=update.effective_chat.id, voice=open(audio_name, 'rb'))
+        os.remove(audio_name)
 
 async def set_output(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Начvало разговора, просьба ввести данные."""
@@ -117,10 +110,9 @@ async def done(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return ConversationHandler.END
 
 if __name__ == '__main__':
+
     application = ApplicationBuilder().token(os.environ.get('BOT_TOKEN')).build()
 
-    init_processors()
-    
     start_handler = CommandHandler('start', start)
     reset_handler = CommandHandler('reset', reset)
     save_handler = CommandHandler('save', save)
