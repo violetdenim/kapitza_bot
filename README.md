@@ -25,5 +25,7 @@ docker push kszipa/kapitza-bot
 docker pull kszipa/kapitza-bot
 # run existing docker container
 docker run --rm --gpus all kszipa/kapitza-bot
+# or
+docker run --gpus all kszipa/kapitza-bot
 ```
 
