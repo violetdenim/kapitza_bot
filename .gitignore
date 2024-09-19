@@ -3,3 +3,4 @@ src/__pycache__/*
 *.ogg
 .env
 .env
+audio-tcp/voice

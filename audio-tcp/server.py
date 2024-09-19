@@ -63,7 +63,7 @@ class TaskGenerator(threading.Thread):
             time.sleep(random.random() * 3.0)
             self.queue.put(file)
 
-def queued_audio_server(files=["short.wav", "temp.wav", "short.wav", "temp.wav", "short.wav"]):
+def queued_audio_server(files):
     queue = Queue()
     generator = TaskGenerator(queue, [os.path.abspath(f) for f in files])
     server = QueuedThread(queue)
@@ -71,7 +71,7 @@ def queued_audio_server(files=["short.wav", "temp.wav", "short.wav", "temp.wav",
     generator.start()
     queue.join()
 
-def successive_audio_server(files=["short.wav", "temp.wav", "short.wav", "temp.wav", "short.wav"]):
+def successive_audio_server(files):
     queue = Queue()
     server = QueuedThread(queue)
     server.start()
@@ -83,6 +83,6 @@ def successive_audio_server(files=["short.wav", "temp.wav", "short.wav", "temp.w
     queue.join()
 
 if __name__ == "__main__":
-    successive_audio_server(["short.wav", "short.wav"])
+    successive_audio_server(["voice/1.wav", "voice/2.wav", "voice/3.wav"])
 
 
