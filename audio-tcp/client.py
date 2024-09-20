@@ -15,23 +15,6 @@ host_name = socket.gethostname()
 host_ip = socket.gethostbyname(host_name) # os.environ.get("HOST_IP")
 port = int(os.environ.get("HOST_PORT"))
 
-class StreamingBuffer:
-	def __init__(self, stream=True, CHUNK=1024):
-		os.environ['SDL_AUDIODRIVER'] = 'dsp'
-		self.p = pyaudio.PyAudio()
-		self.CHUNK = CHUNK # to use this buffer we must decode wav file params
-		self.stream = self.p.open(format=self.p.get_format_from_width(2),
-						channels=2, rate=44100, output=True, frames_per_buffer=self.CHUNK)
-
-	def push(self, frame):
-		if self.stream.is_active():
-			self.stream.write(frame)
-	
-	def close(self):
-		if self.stream.is_active():
-			self.stream.close()
-		self.p.terminate()
-
 class SavingBuffer:
 	def __init__(self):
 		self.data = b""
@@ -47,35 +30,83 @@ class SavingBuffer:
 			f.write(self.data)
 		self.data = b""
 
+class WavInfo:
+    """Class for storing wav parameters to pass to pyaudio"""
+    frame_rate: int
+    num_channels: int
+    sample_width: int
+
+    def __init__(self, frame) -> float:
+        assert(len(frame)==44)
+        assert(frame[0:4]==b'RIFF')
+        wav_size = struct.unpack('I', frame[4:8])[0]
+        assert(frame[8:12]==b'WAVE')
+        assert(frame[12:16]==b'fmt ')
+        assert(struct.unpack('I', frame[16:20])[0] == 16)
+        format_tag, num_channels = struct.unpack('2h', frame[20:24])
+        sample_rate, byte_rate = struct.unpack('2I', frame[24:32])
+        block_align, bits_per_sample = struct.unpack('2h', frame[32:36])
+        assert(byte_rate == block_align * sample_rate)
+        assert(frame[36:40]==b'data')
+        data_size = struct.unpack('I', frame[40:44])[0]
+        assert(wav_size == data_size + 36)
+
+        self.sample_width = bits_per_sample // 8
+        self.frame_rate = sample_rate
+        self.num_channels = num_channels
+        # num_samples = data_size // (num_channels * sample_width)
+
 class SavingBufferWithStreaming:
-	def __init__(self):
+	def __init__(self, do_streaming=True):
 		self.data = b""
-		self.header_data = b""
+		if do_streaming:
+			self.p = pyaudio.PyAudio()
+			os.environ['SDL_AUDIODRIVER'] = 'dsp'
+			self.stream = None
+		else:
+			self.p = None
 
 	def push(self, frame):
-		if len(self.data) == 0: # first block
-			self.header_data = frame[:40]
-			self.data = frame[40:]
-		else:
-			self.data += frame
+		if self.p:
+			if self.stream is None:
+				WAV_HEADER_SIZE = 44
+				header = WavInfo(frame[:WAV_HEADER_SIZE])
+				self.stream = self.p.open(format=self.p.get_format_from_width(header.sample_width),
+						channels=header.num_channels,
+						rate=header.frame_rate,
+						output=True)
+				if self.stream.is_active():
+					self.stream.write(frame[WAV_HEADER_SIZE:])
+			else:
+				if self.stream.is_active():
+					self.stream.write(frame)
+		self.data += frame
 		
-	
 	def is_closed(self):
 		return len(self.data) == 0
 	
 	def close(self, out_file="received.wav"):
+		if self.p:
+			if self.stream.is_active():
+				self.stream.close()
+			self.stream = None # prepare for the next transmission
+
 		with open(out_file, "wb") as f:
-			f.write(self.header_data + self.data)
+			f.write(self.data)
 		self.data = b""
-		self.header_data = b""
+	
+	def __exit__(self):
+		if self.p:
+			self.p.terminate()
 
 class Receiver(threading.Thread):
-	def __init__(self, cleanup=True):
+	def __init__(self, cleanup=True, stream_to_output=True):
 		threading.Thread.__init__(self)
+		self.stream_to_output = True
+		self.cleanup = cleanup
+
 		self.saving_period = 3.0
 		self.restarting_period = 30.0
-		
-		self.cleanup = cleanup
 		self.folder = '.received'
 		if os.path.exists(self.folder):
 			for f in os.listdir(self.folder):
@@ -91,8 +122,7 @@ class Receiver(threading.Thread):
 		
 		file_name = next(tempfile._get_candidate_names()) + ".wav"
 
-		stream = SavingBufferWithStreaming() 
-		block_size = 4 * CHUNK
+		stream = SavingBufferWithStreaming(do_streaming=self.stream_to_output) 
 		
 		waiting_interval = self.saving_period
 		data = b""
@@ -101,7 +131,7 @@ class Receiver(threading.Thread):
 			try:
 				while len(data) < payload_size:
 					client_socket.settimeout(waiting_interval)
-					packet = client_socket.recv(block_size) # 4K
+					packet = client_socket.recv(CHUNK) # 4K
 					if len(packet) == 0:
 						raise Exception("Empty packet during payload")
 					waiting_interval = self.saving_period
@@ -112,7 +142,7 @@ class Receiver(threading.Thread):
 					client_socket.settimeout(waiting_interval)
 					if len(packet) == 0:
 						raise Exception("Empty packet during message receive")
-					data += client_socket.recv(block_size)
+					data += client_socket.recv(CHUNK)
 					waiting_interval = self.saving_period
 				frame_data, data = data[:msg_size], data[msg_size:] # pass left-over to the next message
 				# frame = pickle.loads(frame_data)
@@ -133,9 +163,7 @@ class Receiver(threading.Thread):
 					# wait for more 
 					waiting_interval = self.restarting_period - self.saving_period
 
-				
-
 if __name__ == "__main__":
-	Receiver().start()
+	Receiver(stream_to_output=True).start()
 
  
