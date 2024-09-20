@@ -24,29 +24,29 @@ class QueuedThread(threading.Thread):
     
     def run(self):
         client_socket, addr = self.server_socket.accept()
-        try:
-            while True:
-                # close connection after delay
-                file_name = self.queue.get(self.timeout) 
-                # prepare data to stream
-                with open(file_name, 'rb') as f:
-                    while len(data := f.read(self.chunk)):
-                        try:
-                            # a = pickle.dumps(data)
-                            a = data
-                            message = struct.pack("Q", len(a))+a
-                            client_socket.sendall(message)        
-                        except Exception as e:
-                            print(f"Transmission interrupted by client for file {file_name}. Exception: {e}")
-                            self.server_socket.close()
-                            self.queue.task_done()
-                            return -1    
-                print(f"Finished transmission for file {file_name}")
-                self.queue.task_done()
-        except Exception as e:
-            print(f"Empty queue for {self.timeout} seconds! {e}")
-            self.server_socket.close()
-            return -1
+        # connected to a client, pass files from queue to a client
+        while True:
+            # close connection after delay
+            try:
+                file_name = self.queue.get(block=True, timeout=self.timeout) 
+            except Exception as e:
+                print(f"Empty queue for {self.timeout} seconds! Server is closing connection.")
+                self.server_socket.close()
+                return 0
+            # prepare data to stream
+            with open(file_name, 'rb') as f:
+                while len(data := f.read(self.chunk)):
+                    try:
+                        message = struct.pack("Q", len(data))+data
+                        client_socket.sendall(message)        
+                    except Exception as e:
+                        print(f"Transmission interrupted by client for file {file_name}. Exception: {e}")
+                        self.server_socket.close()
+                        self.queue.task_done()
+                        return -1    
+            print(f"Finished transmission for file {file_name}")
+            self.queue.task_done()
+       
 
 class TaskGenerator(threading.Thread):
     def __init__(self, queue, list_of_files):
@@ -80,7 +80,7 @@ def successive_audio_server(files, timeout=10.0):
     queue.join()
 
 if __name__ == "__main__":
-    #successive_audio_server(["voice/1.wav", "voice/2.wav", "voice/3.wav"])
+    # successive_audio_server(["voice/1.wav", "voice/2.wav", "voice/3.wav"])
     successive_audio_server(["voice/short.wav"])
 
 
