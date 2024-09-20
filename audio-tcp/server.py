@@ -25,7 +25,6 @@ class QueuedThread(threading.Thread):
     def run(self):
         client_socket, addr = self.server_socket.accept()
         # connected to a client, pass files from queue to a client
-        # last_transmission_time = None
         while True:
             # close connection after delay
             try:
@@ -34,29 +33,21 @@ class QueuedThread(threading.Thread):
                 print(f"Empty queue for {self.timeout} seconds! Server is closing connection.")
                 self.server_socket.close()
                 return 0
-
-            # prepare data to stream
-            # if last_transmission_time:
-            #     minimum_delay = 3_000_000 # ns - pause between files
-            #     pause_time = time.time_ns() - last_transmission_time
-            #     if pause_time < minimum_delay:
-            #         # take a break
-            #         # TBD: for files it is better to check file ending
-            #         time.sleep(minimum_delay - pause_time) 
-
+            data_len = 0
             with open(file_name, 'rb') as f:
                 while len(data := f.read(self.chunk)):
                     try:
-                        message = struct.pack("Q", len(data))+data
-                        client_socket.sendall(message)        
+                        # message = struct.pack("Q", len(data))+data
+                        # client_socket.sendall(message) 
+                        client_socket.sendall(data)        
+                        data_len += len(data)
                     except Exception as e:
                         print(f"Transmission interrupted by client for file {file_name}. Exception: {e}")
                         self.server_socket.close()
                         self.queue.task_done()
                         os._exit(-1)
-            print(f"Finished transmission for file {file_name}")
+            print(f"Finished transmission for file {file_name}. Sent {data_len} bytes")
             self.queue.task_done()
-            # last_transmission_time = time.time_ns()
        
 
 class TaskGenerator(threading.Thread):
