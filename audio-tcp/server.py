@@ -29,10 +29,11 @@ class QueuedThread(threading.Thread):
                 # close connection after delay
                 file_name = self.queue.get(self.timeout) 
                 # prepare data to stream
-                with wave.open(file_name, 'rb') as wf:
-                    while len(data := wf.readframes(self.chunk)):
+                with open(file_name, 'rb') as f:
+                    while len(data := f.read(self.chunk)):
                         try:
-                            a = pickle.dumps(data)
+                            # a = pickle.dumps(data)
+                            a = data
                             message = struct.pack("Q", len(a))+a
                             client_socket.sendall(message)        
                         except Exception as e:

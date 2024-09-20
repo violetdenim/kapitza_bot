@@ -43,12 +43,14 @@ class SavingBuffer:
 		return len(self.data) == 0
 	
 	def close(self, out_file="received.wav"):
-		with wave.open(out_file, "wb") as wf:
-			wf.setnchannels(2)
-			wf.setsampwidth(2)
-			wf.setframerate(44_100)
-			wf.writeframesraw(self.data)
-			wf.close()
+		# with wave.open(out_file, "wb") as wf:
+		# 	wf.setnchannels(2)
+		# 	wf.setsampwidth(2)
+		# 	wf.setframerate(44_100)
+		# 	wf.writeframesraw(self.data)
+		# 	wf.close()
+		with open(out_file, "wb") as f:
+			f.write(self.data)
 		self.data = b""
 
 class Receiver(threading.Thread):
@@ -99,7 +101,8 @@ class Receiver(threading.Thread):
 					data += client_socket.recv(block_size)
 					waiting_interval = self.saving_period
 				frame_data, data = data[:msg_size], data[msg_size:] # pass left-over to the next message
-				frame = pickle.loads(frame_data)
+				# frame = pickle.loads(frame_data)
+				frame = frame_data
 				stream.push(frame)
 				# data = b""
 				# wait for the next data
