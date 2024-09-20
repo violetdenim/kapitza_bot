@@ -29,23 +29,19 @@ class QueuedThread(threading.Thread):
                 # close connection after delay
                 file_name = self.queue.get(self.timeout) 
                 # prepare data to stream
-                wf = wave.open(file_name, 'rb')
-                while True:
-                    try:
-                        data = wf.readframes(self.chunk)
-                        if len(data) == 0:
-                            print(f"Finished transmission for file {file_name}")
+                with wave.open(file_name, 'rb') as wf:
+                    while len(data := wf.readframes(self.chunk)):
+                        try:
+                            a = pickle.dumps(data)
+                            message = struct.pack("Q", len(a))+a
+                            client_socket.sendall(message)        
+                        except Exception as e:
+                            print(f"Transmission interrupted by client for file {file_name}. Exception: {e}")
+                            self.server_socket.close()
                             self.queue.task_done()
-                            break # break inner while, move to the next file
-                        a = pickle.dumps(data)
-                        message = struct.pack("Q", len(a))+a
-                        client_socket.sendall(message)        
-                    except Exception as e:
-                        print(f"Transmission interrupted by client for file {file_name}. Exception: {e}")
-                        self.server_socket.close()
-                        self.queue.task_done()
-                        return -1
-                print("File completed")
+                            return -1    
+                print(f"Finished transmission for file {file_name}")
+                self.queue.task_done()
         except Exception as e:
             print(f"Empty queue for {self.timeout} seconds! {e}")
             self.server_socket.close()
@@ -71,18 +67,19 @@ def queued_audio_server(files):
     generator.start()
     queue.join()
 
-def successive_audio_server(files):
+def successive_audio_server(files, timeout=10.0):
     queue = Queue()
     server = QueuedThread(queue)
     server.start()
     for f in files:
         # push with  delay
         queue.put(os.path.abspath(f))
-        time.sleep(20.0)
+        time.sleep(timeout)
 
     queue.join()
 
 if __name__ == "__main__":
-    successive_audio_server(["voice/1.wav", "voice/2.wav", "voice/3.wav"])
+    #successive_audio_server(["voice/1.wav", "voice/2.wav", "voice/3.wav"])
+    successive_audio_server(["voice/short.wav"])
 
 

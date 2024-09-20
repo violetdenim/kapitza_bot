@@ -59,15 +59,13 @@ class Receiver(threading.Thread):
 		
 		self.cleanup = cleanup
 		self.folder = '.received'
-		self.cleanup()
+		if os.path.exists(self.folder):
+			for f in os.listdir(self.folder):
+				os.remove(os.path.join(self.folder, f))
+			os.removedirs(self.folder)
 		os.makedirs(self.folder, 0o777, True)
 	
-	def cleanup(self):
-		if not os.path.exists(self.folder):
-			return
-		for f in os.listdir(self.folder):
-			os.remove(os.path.join(self.folder, f))
-		os.removedirs(self.folder)
+	
 
 	def run(self, CHUNK=1024):
 		# create socket
