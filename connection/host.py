@@ -1,5 +1,5 @@
 import os, socket
-from connection import evaluate_my_ip
+from .get_ip import evaluate_my_ip
 
 class Host:
     def __init__(self, evaluate=False):

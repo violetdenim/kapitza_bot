@@ -9,7 +9,8 @@ def evaluate_my_ip():
         s.connect(("8.8.8.8", 53))
         ips.append(s.getsockname()[0])
         s.close()
-    print(*ips)
+    # print(*ips)
+    return ips[0]
 
 
 if __name__ == "__main__":
