@@ -1,10 +1,15 @@
 import os, socket
+from connection import evaluate_my_ip
 
 class Host:
-    def __init__(self):
-        self.host_name = socket.gethostname()
-        self.host_ip = socket.gethostbyname(self.host_name) # os.environ.get("HOST_IP")
+    def __init__(self, evaluate=False):
+        # self.host_name = socket.gethostname()
+        if evaluate:
+            self.host_ip = evaluate_my_ip()
+        else:
+            self.host_ip = os.environ.get("HOST_IP") 
         self.port = int(os.environ.get("HOST_PORT"))
+        print(f"Host ip: {self.host_ip}, host port: {self.port}")
 
     def connected_client_socket(self):
         # create socket
