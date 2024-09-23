@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04 as runtime
+FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04 AS runtime
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -55,15 +55,15 @@ RUN pip install llama-index llama-index-embeddings-huggingface
 RUN pip install --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu121 llama-cpp-python 
 RUN pip install llama-index-llms-llama_cpp
 RUN pip install TTS pyannote.audio accelerate
-# install tools for straming and file processing
-RUN pip install pyaudio wave
-# install tool for socket communication
-RUN pip install socket
-COPY . .
 RUN pip install huggingface_hub
+COPY . .
 RUN python hf_login.py
 RUN git config --global credential.helper store
 RUN apt-get install git-lfs
 RUN git lfs install
-ENTRYPOINT ["conda", "run", "--no-capture-output", "-n", "kap_env", "python", "run.py"]
+# install tools for straming and wav-file processing
+RUN apt-get update && apt-get install -y portaudio19-dev python3-pyaudio
+RUN pip install pyaudio wave argparse
+
+ENTRYPOINT ["conda", "run", "--no-capture-output", "-n", "kap_env", "python", "client.py"]
 # CMD python run.py

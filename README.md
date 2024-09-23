@@ -43,5 +43,7 @@ docker run -t --network=host kszipa/kapitza-server
 docker push kszipa/kapitza-server
 
 docker build -t kszipa/kapitza-client -f Dockerfile.response .
+docker run --rm --gpus all -t --network=host kszipa/kapitza-client
+docker push kszipa/kapitza-client
 ```
 

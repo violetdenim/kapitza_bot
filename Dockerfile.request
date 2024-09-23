@@ -35,3 +35,4 @@ RUN pip install python-dotenv
 # RUN pip3 install pyaudio 
 COPY . .
 CMD ["conda", "run", "-n", "kap_env", "--no-capture-output",  "python", "server.py"]
+#, "--ip", "10.16.65.11"]
