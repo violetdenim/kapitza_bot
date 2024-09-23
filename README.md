@@ -39,7 +39,7 @@ Dockerfile.request - generates container for Server
 Dockerfile.response - generates container for Client
 ```
 docker build -t kszipa/kapitza-server -f Dockerfile.request .
-docker run -t kszipa/kapitza-server
+docker run -t --network=host kszipa/kapitza-server
 docker push kszipa/kapitza-server
 
 docker build -t kszipa/kapitza-client -f Dockerfile.response .
