@@ -29,3 +29,10 @@ docker run --rm --gpus all kszipa/kapitza-bot
 docker run --gpus all kszipa/kapitza-bot
 ```
 
+# Client - Server app
+Servers - sends audio to client
+Client - uses pipeline to generate audio-answer and sends it back to server
+
+Dockerfile.request - generates conrainer for Server
+Dockerfile.response - generates container for Client
+
