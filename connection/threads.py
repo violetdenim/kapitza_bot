@@ -4,7 +4,7 @@ import pyaudio, wave
 from .buffer import SavingBufferWithStreaming
 
 from queue import Queue
-from .host import Host
+from .host import Host, Sender, Receiver, InputMedium, OutputMedium
 from pipeline import Pipeline
 
 class DummyReceiver(threading.Thread):
@@ -31,20 +31,24 @@ class DummyReceiver(threading.Thread):
 
 class DummyPipeline(threading.Thread):
 	""" Imitates Pipeline Interface, but does nothing"""
-	def __init__(self, input_queue: Queue, output_queue: Queue, timeout=None):
+	def __init__(self, input: InputMedium, output: OutputMedium, timeout=None):
 		threading.Thread.__init__(self)
-		self.input_queue = input_queue
-		self.output_queue = output_queue
+		self.input = input
+		self.output = output
 		self.timeout = timeout
 	
 	def run(self):
 		while True:
 			try:
-				input_user_name, input_file_name = self.input_queue.get(timeout=self.timeout)
+				data = self.input.get(timeout=self.timeout)
+				if len(data) == 0:
+					raise Exception("No Data!")
 			except Exception as e:
+				print(f"{__class__.__name__}: no data")
 				return 0
-			self.output_queue.put(input_file_name)
-			self.input_queue.task_done()
+			print(f"{__class__.__name__}: sending {len(data)} bytes")
+			self.output.send(data)
+			self.input.task_done()
 
 class StreamingThread(threading.Thread):
 	""" Thread uses output device to play audios from queue """
@@ -81,7 +85,7 @@ class ReceiverThread(threading.Thread):
 	def __init__(self, output_queue: Queue, host: Host, cleanup=True, saving_period=3.0, restarting_period=30.0):
 		threading.Thread.__init__(self)
 		self.output_queue = output_queue
-		self.host = host
+		self.receiver = Receiver(host)
 		self.cleanup = cleanup
 
 		self.saving_period = saving_period
@@ -94,9 +98,10 @@ class ReceiverThread(threading.Thread):
 			os.removedirs(self.folder)
 		os.makedirs(self.folder, 0o777, True)
 
-	def run(self, CHUNK=1024):
+	def run(self):
 		# create socket
-		client_socket = self.host.connected_client_socket()
+		# client_socket = self.host.connected_client_socket()
+		self.receiver.establish_connection()
 		
 		file_name = next(tempfile._get_candidate_names()) + ".wav"
 		# disable class streaming, use queue for playing files
@@ -106,8 +111,9 @@ class ReceiverThread(threading.Thread):
 		leftover = None
 		while True:
 			try:
-				client_socket.settimeout(waiting_interval)
-				packet = client_socket.recv(CHUNK) # 4K
+				# client_socket.settimeout(waiting_interval)
+				packet = self.receiver.get(timeout=waiting_interval)
+				# packet = client_socket.recv(CHUNK) # 4K
 				if len(packet) == 0:
 					raise Exception("End of transmission")
 				waiting_interval = self.saving_period
@@ -120,7 +126,7 @@ class ReceiverThread(threading.Thread):
 				# we will not wait anymore
 				if waiting_interval > self.saving_period:
 					print(f"Tired of waiting. I'm closing the connection.")
-					client_socket.close()
+					# client_socket.close()
 					return 0 
 				else: # end of melody
 					output_name = os.path.abspath(os.path.join(self.folder, file_name) )

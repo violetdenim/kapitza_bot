@@ -2,13 +2,15 @@
 import os
 import threading
 from queue import Queue
-from connection.host import Host
+from connection.host import Host, InputMedium, OutputMedium
+from connection.threads import DummyPipeline
 import pyaudio
 import argparse
 # from connection.sender import SenderThread
 # from connection.threads import ReceiverThread
 import io, wave
 from dataclasses import dataclass
+from enum import Enum
 
 @dataclass
 class DataSettings:
@@ -21,12 +23,13 @@ class SerializationSettings:
     timeout = 1.0 # in seconds
     serialize_wav = True
 
+
 class StreamingWavsThread(threading.Thread):
     """ Thread uses output device to play audios from queue """
-    def __init__(self, input_queue: Queue, data_settings: DataSettings, serialization_settings: SerializationSettings):
+    def __init__(self, input_medium: InputMedium, data_settings: DataSettings, serialization_settings: SerializationSettings):
         threading.Thread.__init__(self)
         self.p = pyaudio.PyAudio()
-        self.queue = input_queue
+        self.medium = input_medium
         self.data_settings = data_settings
         self.serialization_settings = serialization_settings
 
@@ -42,7 +45,10 @@ class StreamingWavsThread(threading.Thread):
         while True:
             try:
                 # first time wait indefinitelly, and after that wait for self.timeout seconds
-                data = self.queue.get(block=True, timeout=None if is_first else self.serialization_settings.timeout)
+                # data = self.queue.get(block=True, timeout=None if is_first else self.serialization_settings.timeout)
+                data = self.medium.get(timeout=None if is_first else self.serialization_settings.timeout)
+                if len(data) == 0:
+                    raise Exception("No Data!")
                 print(f"Got {len(data)} bytes")
                 if self.serialization_settings.serialize_wav:
                     bytes_obj = io.BytesIO(data)
@@ -55,7 +61,7 @@ class StreamingWavsThread(threading.Thread):
             try:
                 print(f"Writing {len(data)} bytes to stream")
                 self.stream.write(data)
-                self.queue.task_done()
+                self.medium.task_done()
             except Exception as e:
                 print(f"Streaming: exception {e}")
                 return -1
@@ -67,10 +73,10 @@ class StreamingWavsThread(threading.Thread):
 
 class RecordingWavsThread(threading.Thread):
     """ Thread uses input device to record audio blocks, pack it to wav-files and put them to queue """
-    def __init__(self, output_queue: Queue, record_seconds, data_settings: DataSettings, serialization_settings: SerializationSettings):
+    def __init__(self, output_medium: OutputMedium, record_seconds, data_settings: DataSettings, serialization_settings: SerializationSettings):
         threading.Thread.__init__(self)
         self.p = pyaudio.PyAudio()
-        self.queue = output_queue
+        self.medium = output_medium
         self.data_settings = data_settings
         self.serialization_settings = serialization_settings
 
@@ -96,7 +102,8 @@ class RecordingWavsThread(threading.Thread):
                         wf.writeframes(data)
                     bytes_obj.seek(0)
                     data = bytes_obj.read()
-                self.queue.put(data)
+                # self.queue.put(data)
+                self.medium.send(data)
                 print(f"RecordingWavsThread sent {len(data)} bytes")
             print("Finished recording!")
             return 0
@@ -134,31 +141,58 @@ def stream_between_threads(serialize_to_wav):
     serialization_settings.serialize_to_wav = serialize_to_wav
 
     q = Queue()
-    StreamingWavsThread(q, data_settings=data_settings, serialization_settings=serialization_settings).start()
-    RecordingWavsThread(q, record_seconds=3, data_settings=data_settings, serialization_settings=serialization_settings).start()
+    StreamingWavsThread(InputMedium(connector=q), data_settings=data_settings, serialization_settings=serialization_settings).start()
+    RecordingWavsThread(OutputMedium(connector=q), record_seconds=3, data_settings=data_settings, serialization_settings=serialization_settings).start()
     q.join()
 
-def stream_between_nodes():
-    # TBD:
-    parser = argparse.ArgumentParser(prog='Program to stream mic to audio using ports', \
-    description='First node sends data to the second node. \
-        Second node does something with that data and sends packets back. \
-        First node plays back response. \
-        Run this script twice as first and second node.',
-    epilog='Adress your questions to K.Zipa via k.zipa@skoltech.ru')
-    # parsing ip and port
-    parser.add_argument("--node", help='Specify node index - 0 or 1.', required=True)
-    parser.add_argument("--ip", help='Specify ip address. If no address is specified, it will be dynamically calculated.', default=None)
-    parser.add_argument("--port1", help='Specify connection port1 (from node0 to node1). If not specified 9611 will be used.', default=9611)
-    parser.add_argument("--port2", help='Specify connection port2 (from node1 to node0). If not specified 9612 will be used.', default=9612)
-    args = parser.parse_args()
+    
 
-    if args.node == 0:
-        sending_host = Host(ip=args.ip)
+def stream_between_nodes(serialize_to_wav):
+    os.environ['SDL_AUDIODRIVER'] = 'dsp'
+    
+    data_settings = DataSettings()
+    serialization_settings = SerializationSettings()
+    # overrde defaults
+    serialization_settings.serialize_to_wav = serialize_to_wav
+    ip = None
+    port1 = 6911
+    # sender should be run before acceptor
+    
+    node1_proc1 = RecordingWavsThread(OutputMedium(ip=ip, port=port1), record_seconds=3, data_settings=data_settings, serialization_settings=serialization_settings)
+    node2_proc1 = StreamingWavsThread(InputMedium(ip=ip, port=port1), data_settings=data_settings, serialization_settings=serialization_settings)
+
+    node1_proc1.start()
+    node2_proc1.start()
+
+
+def stream_between_nodes2(serialize_to_wav):
+    os.environ['SDL_AUDIODRIVER'] = 'dsp'
+    
+    data_settings = DataSettings()
+    serialization_settings = SerializationSettings()
+    # overrde defaults
+    serialization_settings.serialize_to_wav = serialize_to_wav
+    ip = None
+    port1 = 6902
+    port2 = port1 + 1
+    # sender should be run before acceptor
+    node1_proc1 = RecordingWavsThread(OutputMedium(ip=ip, port=port1), record_seconds=3, data_settings=data_settings, serialization_settings=serialization_settings)
+    node1_proc2 = StreamingWavsThread(InputMedium(ip=ip, port=port2), data_settings=data_settings, serialization_settings=serialization_settings)
+
+    q = Queue() # use intermediate queue as an example
+    DummyPipeline(InputMedium(ip=ip, port=port1), OutputMedium(connector=q)).start()
+    DummyPipeline(InputMedium(connector=q), OutputMedium(ip=ip, port=port2)).start()
+    q.join()
+    
+    node1_proc1.start()
+    node1_proc2.start()
+
+    
 
 if __name__ == "__main__":
     # stream_default()
-    stream_between_threads(serialize_to_wav=False)
-    # stream_between_nodes()
+    # stream_between_threads(serialize_to_wav=True)
+
+    stream_between_nodes2(serialize_to_wav=True)
 
 
