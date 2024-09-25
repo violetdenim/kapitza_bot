@@ -18,5 +18,7 @@ llama-index-llms-llama_cpp
 TTS
 pyannote.audio
 accelerate
+###
+pre-commit
 
 
