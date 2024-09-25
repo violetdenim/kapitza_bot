@@ -10,12 +10,6 @@ RAG_PATH="docs"
 Copy `BOT_TOKEN` to access telegram and
 `HUGGINGFACE_ACCESS_TOKEN` to access `huggingface.co` if needed
 
-# conda environment
-system cuda 12.1
-```
-conda create -n kap_env python=3.11 && conda activate kap_env && pip install -r requirements.txt
-```
-
 # Docker
 ```
 # build docker container
@@ -29,7 +23,8 @@ docker run --rm --gpus all kszipa/kapitza-bot
 docker run --gpus all kszipa/kapitza-bot
 ```
 
-``` [docker-build.sh]
+```
+# docker-build.sh
 # build and push docker containers
 docker build -t kszipa/kapitza -f docker/Dockerfile.base .
 docker build -t kszipa/kapitza-bot -f docker/Dockerfile.bot .

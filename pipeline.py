@@ -1,3 +1,4 @@
+import sys
 import os
 import dotenv
 
@@ -42,9 +43,18 @@ class Pipeline:
 
 
 if __name__ == '__main__':
-    user_name = "Василий"
-    file_to_process = f"voice_note.wav"
-    output_mode = "audio"
-    pipe = Pipeline()
-    result = pipe.process(user_name=user_name,
-                          file_to_process=file_to_process, output_mode="audio")
+    # result = pipe.process(user_name="Василий",
+    #                       file_to_process=f"voice/1.wav", output_mode="audio")
+    # print(f"Answer to Василий saved to {result}")
+    
+    msg = "Здравствуйте, Сергей Петрович!"
+    
+    # override system outputs
+    default_out, default_err = sys.stdout, sys.stderr
+    with open(os.devnull, 'w'), open(os.devnull, 'w') as sys.stdout, sys.stderr:
+        sys.stderr = open(os.devnull, 'w')
+        pipe = Pipeline()
+        result = pipe.process(user_name="Василий", user_message=msg, output_mode="text")
+    sys.stdout, sys.stderr = default_out, default_err
+    print(f"Василий: {msg}")
+    print(f"Сергей Петрович: {result}")
