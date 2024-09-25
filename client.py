@@ -2,6 +2,7 @@ import argparse, dotenv
 from queue import Queue
 
 from connection.threads import *
+from connection.sender import SenderThread
 from connection.host import Host
 
 
@@ -16,16 +17,17 @@ if __name__ == "__main__":
 
 	# receive, process and play
 	dotenv.load_dotenv()
-	host = Host(ip=args.ip, port=args.port)
 
 	q1, q2 = Queue(), Queue()
+	receiver = ReceiverThread(q1, Host(ip=args.ip, port=args.port), saving_period=1.0, restarting_period=30.0)
 	pipeline = PipelineThread(q1, q2, timeout=30.0) # DummyPipeline(q1, q2) #
-	receiver = ReceiverThread(q1, host, saving_period=1.0, restarting_period=30.0)
-	streaming = StreamingThread(q2, timeout=30.0)
+	#streaming = StreamingThread(q2, timeout=30.0)
+	sender = SenderThread(q2, Host(ip=args.ip, port=args.port + 1), timeout=30.0)
 	
 	receiver.start()
 	pipeline.start()
-	streaming.start()
+	# streaming.start()
+	sender.start()
 
 	q1.join()
 	q2.join()

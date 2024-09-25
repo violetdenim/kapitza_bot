@@ -2,6 +2,7 @@ import os, time, argparse, dotenv
 from queue import Queue
 
 from connection.sender import SenderThread
+from connection.threads import ReceiverThread
 from connection.host import Host
 
 
@@ -17,14 +18,30 @@ if __name__ == "__main__":
     dotenv.load_dotenv()
     # dynamically evaluate current IP
     # int(os.environ.get("HOST_PORT"))
-    host = Host(ip=args.ip, port=args.port)
-    queue = Queue()
-    SenderThread(queue, host, timeout=10.0).start()
-
+    input_queue = Queue()
+    result_queue = Queue()
+    SenderThread(input_queue, Host(ip=args.ip, port=args.port), timeout=10.0, finalize=False).start()
+    ReceiverThread(result_queue, Host(ip=args.ip, port=args.port+1), do_streaming=True, folder='.received_feedback').start()
+    
     files = ["voice/1.wav", "voice/2.wav", "voice/3.wav"]
     for f in files:
-        queue.put(os.path.abspath(f))
+        input_queue.put(os.path.abspath(f))
         time.sleep(5.0)
-    queue.join()
+    input_queue.join()
+
+    while True:
+        result = result_queue.get(block=True, timeout=30)
+        if len(result) > 0:
+            print(f"Got feedback: {result}")
+        else:
+            print("End of queue")
+            break
+        result_queue.task_done()
+
+    result_queue.join()
+
+    
+
+
 
 
