@@ -1,0 +1,2 @@
+FROM kszipa/kapitza
+CMD ["conda", "run", "-n", "kap_env", "--no-capture-output",  "python", "client_emulator.py"]

@@ -1,11 +1,18 @@
 FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04 AS runtime
-# FROM ubuntu:jammy
-
 ARG DEBIAN_FRONTEND=noninteractive
+
+# Uncomment the lines below to use a 3rd party repository
+# to get the latest (unstable from mesa/main) mesa library version
 RUN apt-get update && apt install -y software-properties-common
 RUN add-apt-repository ppa:oibaf/graphics-drivers -y
-RUN apt update && apt install -y vainfo mesa-va-drivers mesa-utils
 
+RUN apt update && apt install -y \
+    vainfo \
+    mesa-va-drivers \
+    mesa-utils
+
+# COPY environment.yml .
+# RUN apt install -y miniconda
 ENV PATH="/root/miniconda3/bin:${PATH}"
 ARG PATH="/root/miniconda3/bin:${PATH}"
 # Install wget to fetch Miniconda
@@ -27,15 +34,31 @@ RUN arch=$(uname -m) && \
     mkdir -p /root/.conda && \
     bash miniconda.sh -b -p /root/miniconda3 && \
     rm -f miniconda.sh
-
 RUN apt-get update && apt install -y git
 RUN conda create -n kap_env python=3.11
 
+# Make RUN commands use the new environment:
 SHELL ["conda", "run", "-n", "kap_env", "/bin/bash", "-c"]
-# install tools for straming and file processing
-RUN pip install python-dotenv
+
+# install torch in the first place (to avoid errors during flash_attn installation)
+RUN pip install torch torchaudio
+# CMD python -c "import torch; print(torch.cuda.is_available())"
+# RUN pip install -r requirements.txt
+RUN pip install flash_attn python-dotenv python-telegram-bot gitpython runorm
+RUN pip install llama-index llama-index-embeddings-huggingface
+RUN pip install --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu121 llama-cpp-python 
+RUN pip install llama-index-llms-llama_cpp
+RUN pip install TTS pyannote.audio accelerate
+COPY . .
+RUN pip install huggingface_hub
+RUN python hf_login.py
+RUN git config --global credential.helper store
+RUN apt-get install git-lfs
+RUN git lfs install
+
+# install audio packages
 RUN apt-get update && apt-get install -y portaudio19-dev python3-pyaudio
 RUN pip install pyaudio wave argparse
-COPY . .
-CMD ["conda", "run", "-n", "kap_env", "--no-capture-output",  "python", "endpoint.py"]
-#, "--ip", "10.16.65.11"]
+
+# ENTRYPOINT ["conda", "run", "--no-capture-output", "-n", "kap_env", "python", "run.py"]
+# CMD python run.py

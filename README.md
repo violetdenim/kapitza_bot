@@ -29,29 +29,29 @@ docker run --rm --gpus all kszipa/kapitza-bot
 docker run --gpus all kszipa/kapitza-bot
 ```
 
-# Client - Server app
-Servers - sends audio to client
-
-Client - uses pipeline to generate audio-answer and sends it back to server
-
-Dockerfile.request - generates container for Server
-
-Dockerfile.response - generates container for Client
-```
+``` [docker-build.sh]
 # build and push docker containers
-docker build -t kszipa/kapitza-server -f Dockerfile.server .
-docker build -t kszipa/kapitza-endpoint -f Dockerfile.endpoint .
-
-# test them
-docker run --rm --gpus all -t --network=host kszipa/kapitza-server
-docker run --rm --gpus all -t --network=host kszipa/kapitza-endpoint
+docker build -t kszipa/kapitza -f docker/Dockerfile.base .
+docker build -t kszipa/kapitza-bot -f docker/Dockerfile.bot .
+docker build -t kszipa/kapitza-server -f docker/Dockerfile.server .
+docker build -t kszipa/kapitza-client -f docker/Dockerfile.client .
 
 # push them to hub
+docker push kszipa/kapitza
+docker push kszipa/kapitza-bot
 docker push kszipa/kapitza-server
-docker push kszipa/kapitza-endpoint
+docker push kszipa/kapitza-client
+```
 
-# pull them on target system
-docker pull kszipa/kapitza-endpoint
+```
+# pull docker containers to target system
+docker pull kszipa/kapitza-bot
 docker pull kszipa/kapitza-server
+docker pull kszipa/kapitza-client
+
+# test docker containers
+docker run --rm --gpus all -t --network=host kszipa/kapitza-bot
+docker run --rm --gpus all -t --network=host kszipa/kapitza-server
+docker run --rm --gpus all -t --network=host kszipa/kapitza-client
 ```
 
