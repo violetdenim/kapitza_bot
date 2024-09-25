@@ -1,9 +1,8 @@
 __pycache__
 */__pycache__
-
-.env
 voice
 .generated
 .received
 .received_feedback
 
+.env
