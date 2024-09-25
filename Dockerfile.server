@@ -65,5 +65,5 @@ RUN git lfs install
 RUN apt-get update && apt-get install -y portaudio19-dev python3-pyaudio
 RUN pip install pyaudio wave argparse
 
-ENTRYPOINT ["conda", "run", "--no-capture-output", "-n", "kap_env", "python", "client.py"]
+ENTRYPOINT ["conda", "run", "--no-capture-output", "-n", "kap_env", "python", "server.py"]
 # CMD python run.py

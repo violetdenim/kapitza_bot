@@ -38,12 +38,20 @@ Dockerfile.request - generates container for Server
 
 Dockerfile.response - generates container for Client
 ```
-docker build -t kszipa/kapitza-server -f Dockerfile.request .
-docker run -t --network=host kszipa/kapitza-server
-docker push kszipa/kapitza-server
+# build and push docker containers
+docker build -t kszipa/kapitza-server -f Dockerfile.server .
+docker build -t kszipa/kapitza-endpoint -f Dockerfile.endpoint .
 
-docker build -t kszipa/kapitza-client -f Dockerfile.response .
-docker run --rm --gpus all -t --network=host kszipa/kapitza-client
-docker push kszipa/kapitza-client
+# test them
+docker run --rm --gpus all -t --network=host kszipa/kapitza-server
+docker run --rm --gpus all -t --network=host kszipa/kapitza-endpoint
+
+# push them to hub
+docker push kszipa/kapitza-server
+docker push kszipa/kapitza-endpoint
+
+# pull them on target system
+docker pull kszipa/kapitza-endpoint
+docker pull kszipa/kapitza-server
 ```
 

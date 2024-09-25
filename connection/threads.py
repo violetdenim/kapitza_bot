@@ -7,9 +7,7 @@ import wave
 from .buffer import SavingBufferWithStreaming
 
 from queue import Queue
-from .host import Host, Sender, Receiver, InputMedium, OutputMedium
-from pipeline import Pipeline
-
+from .host import Host, Receiver
 
 class DummyReceiver(threading.Thread):
     def __init__(self, host: Host, waiting_period=30.0):
@@ -33,30 +31,6 @@ class DummyReceiver(threading.Thread):
                 print(
                     f"{e}. No transmission for {self.waiting_period} seconds! Received {data_len} bytes")
                 return 0
-
-
-class DummyPipeline(threading.Thread):
-    """ Imitates Pipeline Interface, but does nothing"""
-
-    def __init__(self, input: InputMedium, output: OutputMedium, timeout=None):
-        threading.Thread.__init__(self)
-        self.input = input
-        self.output = output
-        self.timeout = timeout
-
-    def run(self):
-        while True:
-            try:
-                data = self.input.get(timeout=self.timeout)
-                if len(data) == 0:
-                    raise Exception("No Data!")
-            except Exception as e:
-                print(f"{__class__.__name__}: no data")
-                return 0
-            print(f"{__class__.__name__}: sending {len(data)} bytes")
-            self.output.send(data)
-            self.input.task_done()
-
 
 class StreamingThread(threading.Thread):
     """ Thread uses output device to play audios from queue """
@@ -88,7 +62,6 @@ class StreamingThread(threading.Thread):
     def __exit__(self):
         if self.p:
             self.p.terminate()
-
 
 class ReceiverThread(threading.Thread):
     """ Thread accepts audio files using socket and puts their names into queue"""
@@ -152,28 +125,3 @@ class ReceiverThread(threading.Thread):
                     if leftover:
                         # push new chunk to the next stream
                         stream.push(leftover)
-
-
-class PipelineThread(threading.Thread):
-    """ Thread takes file_names from input_queue, processes them and puts answers to output_queue"""
-
-    def __init__(self, input_queue: Queue, output_queue: Queue, timeout=None):
-        # prevent heavy import if parent module doesn't need this thread
-        threading.Thread.__init__(self)
-        self.input_queue = input_queue
-        self.output_queue = output_queue
-        self.timeout = timeout
-        self.processor = Pipeline()
-
-    def run(self):
-        while True:
-            try:
-                input_user_name, input_file_name = self.input_queue.get(
-                    timeout=self.timeout)
-            except Exception as e:
-                return 0
-            print("Got from queue:", input_user_name, input_file_name)
-            output_file_name = self.processor.process(
-                user_name=input_user_name, file_to_process=input_file_name)
-            self.output_queue.put(output_file_name)
-            self.input_queue.task_done()
