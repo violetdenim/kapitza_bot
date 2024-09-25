@@ -20,7 +20,7 @@ class Host:
                 client_socket.connect(self.socket_address)
                 connected = True
             except Exception as e:
-                print(f"Client can not connect for {self.socket_address}")
+                print(f"Client waits for server at {self.socket_address}")
                 time.sleep(10)
                 continue
         return client_socket

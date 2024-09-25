@@ -112,7 +112,6 @@ class ReceiverThread(threading.Thread):
 
     def run(self):
         # create socket
-        # client_socket = self.host.connected_client_socket()
         self.receiver.establish_connection()
 
         file_name = next(tempfile._get_candidate_names()) + ".wav"
@@ -123,9 +122,7 @@ class ReceiverThread(threading.Thread):
         leftover = None
         while True:
             try:
-                # client_socket.settimeout(waiting_interval)
                 packet = self.receiver.get(timeout=waiting_interval)
-                # packet = client_socket.recv(CHUNK) # 4K
                 if len(packet) == 0:
                     raise Exception("End of transmission")
                 waiting_interval = self.saving_period
@@ -138,7 +135,6 @@ class ReceiverThread(threading.Thread):
                 # we will not wait anymore
                 if waiting_interval > self.saving_period:
                     print(f"Tired of waiting. I'm closing the connection.")
-                    # client_socket.close()
                     return 0
                 else:  # end of melody
                     output_name = os.path.abspath(
