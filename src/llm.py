@@ -5,10 +5,10 @@ from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.llms.llama_cpp import LlamaCPP
 from llama_index.llms.llama_cpp.llama_utils import ( messages_to_prompt_v3_instruct, completion_to_prompt_v3_instruct)
 
-from src.utils import *
-import os
+import os, datetime
 # tool to normalize model's output
 from runorm import RUNorm
+from .utils import *
 
 class LLMProcessor:
     def __init__(self, prompt_path, rag_folder,
@@ -18,11 +18,16 @@ class LLMProcessor:
                  ):
         documents = SimpleDirectoryReader(rag_folder, recursive=True).load_data()#"data"
         Settings.embed_model = HuggingFaceEmbedding(model_name=embedding_name)
+        if not model_url.startswith("http"):
+            model_path = model_url
+            model_url = None
+        else:
+            model_path = None
         Settings.llm = LlamaCPP(
             # You can pass in the URL to a GGML model to download it automatically
             model_url=model_url,
             # optionally, you can set the path to a pre-downloaded model instead of model_url
-            model_path=None, #"kap_model/unsloth.Q4_K_M.gguf",
+            model_path=model_path, #"kap_model/unsloth.Q4_K_M.gguf",
             temperature=0.05,
             max_new_tokens=256,
             context_window=4096,
@@ -48,7 +53,7 @@ class LLMProcessor:
         self.postprocessing_fn = lambda x: self.normalizer.norm(drop_ending(strip_substr(x, ['assistant', ' ', '\n'])))
         if use_llama_guard:
             from llama_index.core.llama_pack import download_llama_pack
-            LlamaGuardModeratorPack = download_llama_pack("LlamaGuardModeratorPack", "../llamaguard_pack")
+            LlamaGuardModeratorPack = download_llama_pack("LlamaGuardModeratorPack")#, "../llamaguard_pack")
             self.llamaguard_pack = LlamaGuardModeratorPack()
         else:
             self.llamaguard_pack = None
@@ -58,8 +63,8 @@ class LLMProcessor:
             with open(self.prompt_path, "r", encoding='utf-8') as f:
                 self.prompt = '\n'.join(f.readlines())
         self.prompt = self.prompt.replace("{user_name}", user_name)
-        print(self.prompt)
-        return self.prompt
+        date = datetime.datetime.now().date()
+        return f"Сегодня {date.day}.{date.month}.{date.year}" + self.prompt
     
     def save_context(self, user_name):
         assert(self.current_user == user_name)

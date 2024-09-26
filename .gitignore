@@ -6,3 +6,4 @@ voice
 .received_feedback
 
 .env
+*.wav
