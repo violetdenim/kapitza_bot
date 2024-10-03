@@ -2,7 +2,7 @@ import threading
 from queue import Queue
 from .host import InputMedium, OutputMedium
 from pipeline import Pipeline
-
+import os
 
 class DummyPipeline(threading.Thread):
     """ Imitates Pipeline Interface, but does nothing"""
@@ -67,5 +67,6 @@ class PipelineThread(threading.Thread):
                     output_file_name = self.processor.process(
                         user_name=self.username,
                         file_to_process=input_file_name)
+            os.remove(input_file_name)
             self.output.put(output_file_name)
             self.input.task_done()
