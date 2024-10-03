@@ -41,7 +41,7 @@ class ASRProcessor:
 
         parts = self.vad_pipeline({"waveform": voice, "sample_rate": rate})
         text = ""
-        for segment, track, label in parts.itertracks(yield_label=True):
-            text += self.pipe(voice[0, int(segment.start*rate):int(segment.end*rate)].numpy().flatten())["text"]
+        for segment, _, _ in parts.itertracks(yield_label=True):
+            text += self.pipe(voice[0, int(segment.start * rate):int(segment.end * rate)].numpy().flatten())["text"]
             text += '\n' # end of sentence
         return text

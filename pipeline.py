@@ -44,48 +44,60 @@ class Pipeline:
             return answer
         return self.tts.get_audio(answer, format=".wav" if output_mode == "audio" else ".ogg")
 
-def create_audio():
+import torchaudio, torch
+def concat_wavs(inputs, output):
+    x = []
+    for input in inputs:
+        if not os.path.exists(input):
+            print(f"Skipping {input}: file doesn't exist")
+        data, rate = torchaudio.load(input)
+        x.append(data)
+    x = torch.concatenate(x, dim=1)
+    torchaudio.save(output, x, rate, encoding="PCM_S", backend="soundfile")
+
+def create_audio(output):
     tts = TTSProcessor(os.environ.get("AUDIO_PATH"), hf_token=os.environ.get('HF_AUTH'))
-    text = """ОчвИИдное с Сергеем Капицей.
-    Ведет передачу ИИ-двойник Сергея Капицы.
-Здравствуйте! С вами ИИ-двойник Сергея Капицы. 
-
-Сегодня мы поговорим о том, как создаются такие, как я. А точнее, о внешности
-Чтобы «воссоздать» человека в цифровом мире, нужно его заснять.
-Для этого потребуется специальная сфера с камерами высокого разрешения
-Или телефон с отличной камерой и время
-Уже сейчас на 3D-моделях реальных людей
-Ученые учат искусственный интеллект
-Распознавать человеческие эмоции или изменения во внешности
-С моим прототипом сложнее
-Хотя Сергей Капица работал на телевидении
-Задачи — снимать его в деталях
-и в высоком разрешении никогда не было
-Так что же делали мои создатели
-Чтобы мой образ был точнее?
-Сперва с помощью нейросетей они создали 3D-модель головы
-Получилось очень далеко от оригинала — из-за неправдоподобной текстуры
-Поэтому они взяли большой массив видео, улучшили качество с помощью нейросетей
-и добавили детали на 3D-модель
-Стало чуть лучше, но все еще плохо
-Поэтому было решено надеть поверх 3D-модели deepfake
-В этом варианте текстуру кожи для каждого кадра этого видео генерирует отдельная нейросеть
-Так получился текущий вариант
-Команда проекта продолжает меня улучшать
-И работает над деталями
-Об этом вы можете узнать на странице проекта
-До новых встреч на “Техпросвете”!
-"""
-    print(tts.get_audio(text, format=".wav"))
-
+    
+    # texts = ["""ОчевИИдное с Сергеем Капитсей.
+    # Ведет передачу И И двойник Сергея Капитсы.""",
+    # """Здравствуйте! С вами И И двойник Сергея Капитсы. 
+    # Сегодня мы поговорим о том, как создаются такие, как я. А точнее, о внешности...""",
+    # """Чтобы воссоздать человека в цифровом мире, нужно его заснять.
+    # Для этого потребуется специальная сфера с камерами высокого разрешения или телефон с отличной камерой и время.""",
+    # """Уже сейчас на три-дэ-моделях реальных людей ученые учат искусственный интеллект распознавать человеческие эмоции или изменения во внешности.
+    # С моим прото типом сложнее...""",
+    # """Хотя Сергей Капица работал на телевидении, задачи — снимать его в деталях и в высоком разрешении - никогда не было!""",
+    # """Так что же делали мои создатели, чтобы мой образ был точнее?
+    # Сперва с помощью нейросетей они создали три-дэ-модель головы. Получилось очень далеко от оригинала — из-за неправдоподобной тикстуры.""",
+    # """Поэтому они взяли большой массив видео, улучшили качество с помощью нейросетей и добавили детали на три-дэ-модель. Стало чуть лучше, но все еще плохо.
+    # Поэтому было решено надеть поверх три-дэ-модели дипфейк.""",
+    # """В этом варианте тикстуру кожи для каждого кадра этого видео генерирует отдельная нейросеть. Так получился текущий вариант.""",
+    # """Команда проекта продолжает меня улучшать и работает над деталями. Об этом вы можете узнать на странице проекта. До новых встреч на “Техпросвете”!"""
+    # ]
+    # names = []
+    # for i_index, text in enumerate(texts):
+    #     for i_try in range(7, 9):
+    #         name = f"{i_index}_{i_try}.wav"
+    #         print(name)
+    #         names.append(name)
+    #         tts.get_audio(text, format=".wav", output_name=name)
+            
+    # concat_wavs(names, output)
+    tts.get_audio("""генеративную маску""", format=".wav", output_name=output)
+    
 if __name__ == '__main__':
-    create_audio()
+    # names = [f for f in os.listdir('.') if os.path.splitext(f)[-1] == ".wav"]
+    # names = sorted(names)
+    # print(names)
+    # concat_wavs(names, "generated.wav")
+    create_audio("generated3.wav")
     exit()
     os.environ["HUGGINGFACE_ACCESS_TOKEN"] = os.environ["HF_AUTH"]
-    # model_url = "https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf?download=true"
+    model_url = "https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf?download=true"
     # model_url = 'https://huggingface.co/QuantFactory/Meta-Llama-3-70B-Instruct-GGUF-v2/resolve/main/Meta-Llama-3-70B-Instruct-v2.Q4_K_M.gguf?download=true'
-    quant = "BF16"#"Q4_K_M"
-    model_url = f"/home/zipa/DataFromD/lara_pc_data/kap34_8_8_10.{quant}.gguf"#.gguf"
+    # model_url = "https://huggingface.co/QuantFactory/Qwen2.5-14B-Instruct-GGUF/resolve/main/Qwen2.5-14B-Instruct.Q4_K_M.gguf?download=true"
+    # quant = "Q4_K_M" # "BF16"#
+    # model_url = f"/home/zipa/DataFromD/lara_pc_data/kap34_8_8_10.{quant}.gguf"#.gguf"
 
     pipe = Pipeline(model_url=model_url, use_llama_guard=False)
     predefined = False

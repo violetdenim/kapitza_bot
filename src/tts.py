@@ -42,11 +42,16 @@ class TTSProcessor:
                                                                                            max_ref_length=self.model.config.max_ref_len,
                                                                                            sound_norm_refs=True)
 
-    def get_audio(self, text, format=".wav"):
+    def get_audio(self, text, format=".wav", output_name=None):
         out = self.model.inference(text=text, language='ru', gpt_cond_latent=self.gpt_cond_latent, speaker_embedding=self.speaker_embedding,
-                                   temperature=0.2, repetition_penalty=10.0, top_k=50, top_p=0.85, enable_text_splitting=True)
-        tmp_filename = next(tempfile._get_candidate_names()) + format
-        tmp_filename = os.path.join(self.folder, tmp_filename)
+                                   temperature=0.2, repetition_penalty=10.0, top_k=50, top_p=0.85,
+                                   speed=0.95,
+                                   enable_text_splitting=True)
+        if output_name is None:
+            tmp_filename = next(tempfile._get_candidate_names()) + format
+            tmp_filename = os.path.join(self.folder, tmp_filename)
+        else:
+            tmp_filename = output_name
         torchaudio.save(tmp_filename, torch.tensor(out["wav"]).unsqueeze(
             0), 24_000, encoding="PCM_S", backend="soundfile")
         return tmp_filename

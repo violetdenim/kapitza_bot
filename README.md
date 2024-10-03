@@ -24,7 +24,7 @@ docker run --gpus all kszipa/kapitza-bot
 ```
 
 ```
-# docker-build.sh
+# ./docker_build.sh latest
 # build and push docker containers
 docker build -t kszipa/kapitza -f docker/Dockerfile.base .
 docker build -t kszipa/kapitza-bot -f docker/Dockerfile.bot .

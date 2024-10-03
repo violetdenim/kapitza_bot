@@ -1,2 +1,2 @@
 FROM kszipa/kapitza
-ENTRYPOINT ["conda", "run", "--no-capture-output", "-n", "kap_env", "python", "server.py"]
+ENTRYPOINT ["conda", "run", "--no-capture-output", "-n", "kap_env", "python", "local_folder_service.py"]

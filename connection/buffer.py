@@ -73,11 +73,14 @@ class SavingBufferWithStreaming:
                     channels=header.num_channels,
                     rate=header.frame_rate,
                     output=True)
-                self.stream.start_stream()
-                if self.stream.is_active():
-                    self.stream.write(frame[WAV_HEADER_SIZE:])
+                if self.stream is None:
+                    print("Couldn't initiate stream")
+                else:
+                    self.stream.start_stream()
+                    if self.stream.is_active():
+                        self.stream.write(frame[WAV_HEADER_SIZE:])
         if self.p:
-            if self.stream.is_active():
+            if self.stream and self.stream.is_active():
                 self.stream.write(frame)
         if len(self.data) > self.bytes_to_read:
             self.data, leftover = self.data[:self.bytes_to_read], self.data[self.bytes_to_read:]
@@ -88,7 +91,7 @@ class SavingBufferWithStreaming:
 
     def close(self, out_file="received.wav"):
         if self.p:
-            if self.stream.is_active():
+            if self.stream and self.stream.is_active():
                 self.stream.stop_stream()
                 self.stream.close()
             self.stream = None  # prepare for the next transmission

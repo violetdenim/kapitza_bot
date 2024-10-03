@@ -1,9 +1,34 @@
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Settings
 from llama_index.core.storage.chat_store import SimpleChatStore
 from llama_index.core.memory import ChatMemoryBuffer
+from llama_index.core.node_parser import SentenceSplitter
+
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+from llama_index.llms.huggingface import HuggingFaceLLM
+
 from llama_index.llms.llama_cpp import LlamaCPP
 from llama_index.llms.llama_cpp.llama_utils import ( messages_to_prompt_v3_instruct, completion_to_prompt_v3_instruct)
+
+
+def completion_to_prompt_qwen(completion):
+   return f"<|im_start|>system\n<|im_end|>\n<|im_start|>user\n{completion}<|im_end|>\n<|im_start|>assistant\n"
+
+def messages_to_prompt_qwen(messages):
+    prompt = ""
+    for message in messages:
+        if message.role == "system":
+            prompt += f"<|im_start|>system\n{message.content}<|im_end|>\n"
+        elif message.role == "user":
+            prompt += f"<|im_start|>user\n{message.content}<|im_end|>\n"
+        elif message.role == "assistant":
+            prompt += f"<|im_start|>assistant\n{message.content}<|im_end|>\n"
+
+    if not prompt.startswith("<|im_start|>system"):
+        prompt = "<|im_start|>system\n" + prompt
+
+    prompt = prompt + "<|im_start|>assistant\n"
+
+    return prompt
 
 import os, datetime
 # tool to normalize model's output
@@ -16,7 +41,7 @@ class LLMProcessor:
                  model_url="https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf?download=true",
                  use_llama_guard=False
                  ):
-        documents = SimpleDirectoryReader(rag_folder, recursive=True).load_data()#"data"
+        documents = SimpleDirectoryReader(rag_folder, recursive=True).load_data() # "data"
         Settings.embed_model = HuggingFaceEmbedding(model_name=embedding_name)
         if not model_url.startswith("http"):
             model_path = model_url
@@ -37,10 +62,24 @@ class LLMProcessor:
             # set to at least 1 to use GPU
             model_kwargs={"n_gpu_layers": 33},
             # transform inputs into Llama2 format
-            messages_to_prompt=messages_to_prompt_v3_instruct,
-            completion_to_prompt=completion_to_prompt_v3_instruct,
+            messages_to_prompt=messages_to_prompt_v3_instruct, # messages_to_prompt_qwen,
+            completion_to_prompt=completion_to_prompt_v3_instruct, # completion_to_prompt_qwen,
             verbose=True,
         )
+
+        # Settings.llm = HuggingFaceLLM(
+        #     model_name="Qwen/Qwen2.5-7B-Instruct",
+        #     tokenizer_name="Qwen/Qwen2.5-7B-Instruct",
+        #     context_window=30000,
+        #     max_new_tokens=2000,
+        #     generate_kwargs={"temperature": 0.7, "top_k": 50, "top_p": 0.95},
+        #     messages_to_prompt=messages_to_prompt_qwen,
+        #     completion_to_prompt=completion_to_prompt_qwen,
+        #     device_map="auto",
+        # )
+        # Set the size of the text chunk for retrieval
+        Settings.transformations = [SentenceSplitter(chunk_size=1024)]
+
         
         self.index = VectorStoreIndex.from_documents(documents)
         self.chat_store = None
@@ -67,10 +106,13 @@ class LLMProcessor:
         return f"Сегодня {date.day}.{date.month}.{date.year}" + self.prompt
     
     def save_context(self, user_name):
-        assert(self.current_user == user_name)
-        self.chat_store.persist(persist_path=self.current_user + ".json")
+        if user_name:
+            assert(self.current_user == user_name)
+            self.chat_store.persist(persist_path=self.current_user + ".json")
 
-    def set_engine(self, user_name, reset=False):
+    def set_engine(self, user_name, reset=False, custom_system_prompt=None):
+        if user_name is None:
+            assert(custom_system_prompt is not None)
         if reset and os.path.exists(user_name + ".json"):
             os.remove(user_name + ".json")
             self.chat_store = SimpleChatStore()
@@ -78,7 +120,7 @@ class LLMProcessor:
         elif user_name != self.current_user:
             if self.current_user is not None:
                 self.chat_store.persist(persist_path=self.current_user + ".json")
-            if os.path.exists(user_name + ".json"):
+            if user_name is not None and os.path.exists(user_name + ".json"):
                 self.chat_store = SimpleChatStore.from_persist_path(persist_path=user_name + ".json")
                 print(f"Creating {user_name} chat store")
             else:
@@ -90,13 +132,14 @@ class LLMProcessor:
                                                      chat_store=self.chat_store, chat_store_key=user_name)
         self.chat_engine = self.index.as_chat_engine(chat_mode="condense_plus_context",
                                                      memory=chat_memory,
-                                                     system_prompt=self.get_system_prompt(user_name))
+                                                     system_prompt=self.get_system_prompt(user_name) if not custom_system_prompt else custom_system_prompt)
         self.current_user = user_name
         
         
 
     def process_prompt(self, prompt, user_name):
-        self.set_engine(user_name)
+        if user_name:
+            self.set_engine(user_name)
         if self.llamaguard_pack:
             moderator_response_for_input = self.llamaguard_pack.run(prompt)
             print(f"moderator response for input: {moderator_response_for_input}")
@@ -113,7 +156,6 @@ class LLMProcessor:
                     response = None
             else:
                 response = None
-            # response = self.chat_engine.chat(prompt)
             if response is None:
                 return "Пожалуй, лучше поговорить на другую тему."
         else:
