@@ -2,6 +2,7 @@ from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
 from pyannote.audio import Model as VADModel
 from pyannote.audio.pipelines import VoiceActivityDetection
 import torch, torchaudio, os
+import time
 
 class ASRProcessor:
     def __init__(self, model_id="openai/whisper-large-v3", hf_token=os.environ.get('HF_AUTH')) -> None:
@@ -36,7 +37,17 @@ class ASRProcessor:
         
     def get_text(self, audio_file):
         rate = 16_000
-        sample = torchaudio.load(audio_file)
+        load_attempts_count = 5
+        sleeping_period = 3.0
+        for i in range(load_attempts_count):
+            try:
+                sample = torchaudio.load(audio_file)
+            except Exception as e:
+                if i < load_attempts_count - 1:
+                    time.sleep(sleeping_period)
+                else:
+                    print(f"Can not read file {audio_file}. I will kill myself")
+                    os._exit(0)
         voice = torchaudio.functional.resample(sample[0], sample[1], rate)
 
         parts = self.vad_pipeline({"waveform": voice, "sample_rate": rate})

@@ -14,7 +14,8 @@ dotenv.load_dotenv()
 class Pipeline:
     def __init__(self,
                  model_url=f"https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf?download=true",
-                 use_llama_guard=False):
+                 use_llama_guard=False,
+                 output_folder=".generated"):
         # model_url = "https://huggingface.co/QuantFactory/Meta-Llama-3.1-8B-GGUF/resolve/main/Meta-Llama-3.1-8B.Q4_K_M.gguf?download=true"
         hf_token = os.environ.get('HF_AUTH')
         self.asr = ASRProcessor(hf_token=hf_token)
@@ -23,7 +24,7 @@ class Pipeline:
             model_url=model_url,
             use_llama_guard=use_llama_guard)
         self.tts = TTSProcessor(os.environ.get(
-            "AUDIO_PATH"), hf_token=hf_token)
+            "AUDIO_PATH"), hf_token=hf_token, output_dir=output_folder)
 
     def set_user(self, user_name):
         self.llm.set_engine(user_name)

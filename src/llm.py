@@ -113,11 +113,11 @@ class LLMProcessor:
     def set_engine(self, user_name, reset=False, custom_system_prompt=None):
         if user_name is None:
             assert(custom_system_prompt is not None)
-        if reset and os.path.exists(user_name + ".json"):
+        if user_name and reset and os.path.exists(user_name + ".json"):
             os.remove(user_name + ".json")
             self.chat_store = SimpleChatStore()
             print("Creating new chat store")
-        elif user_name != self.current_user:
+        elif not user_name or user_name != self.current_user:
             if self.current_user is not None:
                 self.chat_store.persist(persist_path=self.current_user + ".json")
             if user_name is not None and os.path.exists(user_name + ".json"):
@@ -125,6 +125,8 @@ class LLMProcessor:
                 print(f"Creating {user_name} chat store")
             else:
                 self.chat_store = SimpleChatStore()
+                if user_name is None:
+                    user_name = "user" # for technical usage of pipeline
                 print("Creating new chat store")
         else:
             return
@@ -134,6 +136,7 @@ class LLMProcessor:
                                                      memory=chat_memory,
                                                      system_prompt=self.get_system_prompt(user_name) if not custom_system_prompt else custom_system_prompt)
         self.current_user = user_name
+        
         
         
 
