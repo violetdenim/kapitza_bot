@@ -46,8 +46,9 @@ class ASRProcessor:
                 if i < load_attempts_count - 1:
                     time.sleep(sleeping_period)
                 else:
-                    print(f"Can not read file {audio_file}. I will kill myself")
-                    os._exit(0)
+                    # don't kill, just skip
+                    print(f"Can not read file {audio_file}.")
+                    return None
         voice = torchaudio.functional.resample(sample[0], sample[1], rate)
 
         parts = self.vad_pipeline({"waveform": voice, "sample_rate": rate})

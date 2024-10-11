@@ -1,6 +1,7 @@
 import sys
 import os
 import dotenv
+import torchaudio, torch
 os.system("pip install -U accelerate")
 from src.llm import LLMProcessor
 from src.tts import TTSProcessor
@@ -37,6 +38,8 @@ class Pipeline:
         self.llm.set_engine(user_name, reset=True)
         if user_message is None:
             user_message = self.asr.get_text(file_to_process)
+        if user_message is None: # invalid input path, just skip
+            return None
         if len(user_message) == 0:
             return None, "Прошу прощения, не расслышал."
         else:
@@ -45,7 +48,7 @@ class Pipeline:
             return answer
         return self.tts.get_audio(answer, format=".wav" if output_mode == "audio" else ".ogg")
 
-import torchaudio, torch
+
 def concat_wavs(inputs, output):
     x = []
     for input in inputs:

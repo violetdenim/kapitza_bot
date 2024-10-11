@@ -76,6 +76,7 @@ class PipelineThread(threading.Thread):
                         user_name=self.username,
                         file_to_process=input_file_name)
             if self.output:
-                self.output.put(output_file_name)
+                if output_file_name is not None:
+                    self.output.put(output_file_name)
             os.remove(input_file_name)
             self.input.task_done()
