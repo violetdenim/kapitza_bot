@@ -24,6 +24,10 @@ if __name__ == "__main__":
     # cleanup .generated
     input_folder = ".received"
     output_folder = ".generated"
+    # model_url = "https://huggingface.co/kzipa/kap34_8_8_10/resolve/main/kap34_8_8_10.Q4_K_M.gguf?download=true"
+    model_url = "https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf"
+    use_llama_guard = False
+
     os.makedirs(input_folder, 0o777, True)
     os.makedirs(output_folder, 0o777, True)
     for f in os.listdir(output_folder):
@@ -32,6 +36,8 @@ if __name__ == "__main__":
         os.remove(os.path.join(input_folder, f))
     
     filenames_queue = Queue()
-    PipelineThread(filenames_queue, None, timeout=None).start()
+    
+    PipelineThread(filenames_queue, None, timeout=None,
+    pipeline_args={"output_folder" : output_folder, "model_url": model_url, "use_llama_guard": use_llama_guard}).start()
     FolderMonitor(filenames_queue, input_folder=input_folder, check_freq=1.0).start()
     filenames_queue.join()

@@ -30,13 +30,13 @@ class DummyPipeline(threading.Thread):
 class PipelineThread(threading.Thread):
     """ Thread takes file_names from input_queue, processes them and puts answers to output_queue"""
 
-    def __init__(self, input: Queue, output: Queue, timeout=None, pipeline_folder=".generated"):
+    def __init__(self, input: Queue, output: Queue, timeout=None, pipeline_args={}):
         # prevent heavy import if parent module doesn't need this thread
         threading.Thread.__init__(self)
         self.input = input
         self.output = output
         self.timeout = timeout
-        self.processor = Pipeline(output_folder=pipeline_folder)
+        self.processor = Pipeline(**pipeline_args)#output_folder=pipeline_folder)
         # variable to store current username, expect user answer as result
         self.username = None
 
@@ -63,7 +63,7 @@ class PipelineThread(threading.Thread):
             else:
                 if self.username is None: # expect user name as an answer
                     user_answer = self.processor.asr.get_text(input_file_name)
-                    user_answer = user_answer.text.strip(".,! ").capitalize()
+                    user_answer = user_answer.strip(".,! ").capitalize()
                     print(f"User answered: {user_answer}")
                     self.username = user_answer
                     # self.processor.llm.set_engine(user_name=None, reset=True, custom_system_prompt="""Ты - система аутентификации для ASR. Пользователя просили представиться. Выведи в ответ только его имя.""")

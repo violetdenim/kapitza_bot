@@ -13,7 +13,7 @@ dotenv.load_dotenv()
 
 class Pipeline:
     def __init__(self,
-                 model_url=f"https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf?download=true",
+                 model_url=f"https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf",
                  use_llama_guard=False,
                  output_folder=".generated"):
         # model_url = "https://huggingface.co/QuantFactory/Meta-Llama-3.1-8B-GGUF/resolve/main/Meta-Llama-3.1-8B.Q4_K_M.gguf?download=true"
@@ -158,14 +158,14 @@ if __name__ == '__main__':
     # create_audio("generated3.wav")
     # exit()
     os.environ["HUGGINGFACE_ACCESS_TOKEN"] = os.environ["HF_AUTH"]
-    model_url = "https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf?download=true"
+    # model_url = "https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf?download=true"
     # model_url = 'https://huggingface.co/QuantFactory/Meta-Llama-3-70B-Instruct-GGUF-v2/resolve/main/Meta-Llama-3-70B-Instruct-v2.Q4_K_M.gguf?download=true'
     # model_url = "https://huggingface.co/QuantFactory/Qwen2.5-14B-Instruct-GGUF/resolve/main/Qwen2.5-14B-Instruct.Q4_K_M.gguf?download=true"
-    # quant = "Q4_K_M" # "BF16"#
-    # model_url = f"/home/zipa/DataFromD/lara_pc_data/kap34_8_8_10.{quant}.gguf"#.gguf"
+    quant = "Q4_K_M" # "BF16"#
+    model_url=f"https://huggingface.co/kzipa/kap34_8_8_10/resolve/main/kap34_8_8_10.{quant}.gguf?download=true"
 
     pipe = Pipeline(model_url=model_url, use_llama_guard=False)
     quest = get_questions("questions.txt")
-    pipe_on_questions(pipe, quest, output_name="llama3_answers.txt")
-    # interactive_dialogue(pipe)
+    # pipe_on_questions(pipe, quest, output_name="llama3_answers.txt")
+    interactive_dialogue(pipe)
     
