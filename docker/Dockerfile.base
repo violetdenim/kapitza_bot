@@ -53,7 +53,7 @@ COPY . .
 RUN pip install huggingface_hub
 RUN python hf_login.py
 RUN git config --global credential.helper store
-RUN apt-get install git-lfs
+RUN apt-get install git-lfs & apt-get install ubuntu-restricted-extras
 RUN git lfs install
 
 # install audio packages

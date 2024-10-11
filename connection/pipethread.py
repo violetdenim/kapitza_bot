@@ -70,11 +70,11 @@ class PipelineThread(threading.Thread):
                         user_answer = user_answer.strip(".,! ").capitalize()
                         print(f"User answered: {user_answer}")
                         self.username = user_answer
-                        # self.processor.llm.set_engine(user_name=None, reset=True, custom_system_prompt="""Ты - система аутентификации для ASR. Пользователя просили представиться. Выведи в ответ только его имя.""")
-                        # self.username = self.processor.llm.process_prompt(user_answer, user_name="user")
-                        # print(f"System concluded: {user_answer}")
-                        self.processor.set_user(self.username)
-                        output_file_name = self.processor.tts.get_audio(f"{self.username}, приятно познакомиться")
+                    # self.processor.llm.set_engine(user_name=None, reset=True, custom_system_prompt="""Ты - система аутентификации для ASR. Пользователя просили представиться. Выведи в ответ только его имя.""")
+                    # self.username = self.processor.llm.process_prompt(user_answer, user_name="user")
+                    # print(f"System concluded: {user_answer}")
+                    self.processor.set_user(self.username)
+                    output_file_name = self.processor.tts.get_audio(f"{self.username}, приятно познакомиться")
                 else:
                     output_file_name = self.processor.process(user_name=self.username, file_to_process=input_file_name)
             if self.output:
