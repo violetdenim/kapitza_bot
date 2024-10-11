@@ -15,8 +15,11 @@ class FolderMonitor(threading.Thread):
     
     def run(self):
         while True:
-            for file_name in os.listdir(self.input):
-                self.output.put(os.path.join(self.input, file_name))
+            files = [os.path.join(self.input, file_name) for file_name in os.listdir(self.input)]
+            # fetch files using creation date
+            sorted_files = sorted(files, key=lambda x: os.path.getctime(x))
+            for file in sorted_files:
+                self.output.put(file)
             time.sleep(self.check_freq)
 
 if __name__ == "__main__":

@@ -72,9 +72,7 @@ class PipelineThread(threading.Thread):
                     self.processor.set_user(self.username)
                     output_file_name = self.processor.tts.get_audio(f"{self.username}, приятно познакомиться")
                 else:
-                    output_file_name = self.processor.process(
-                        user_name=self.username,
-                        file_to_process=input_file_name)
+                    output_file_name = self.processor.process(user_name=self.username, file_to_process=input_file_name)
             if self.output:
                 if output_file_name is not None:
                     self.output.put(output_file_name)
