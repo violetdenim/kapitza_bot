@@ -1,2 +1,3 @@
-FROM kszipa/kapitza
+ARG TAG=latest
+FROM kszipa/kapitza:$TAG
 ENTRYPOINT ["conda", "run", "--no-capture-output", "-n", "kap_env", "python", "local_folder_service.py"]

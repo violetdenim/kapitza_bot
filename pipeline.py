@@ -86,24 +86,10 @@ def create_audio(output):
     # concat_wavs(names, output)
     tts.get_audio("""генеративную маску""", format=".wav", output_name=output)
     
-if __name__ == '__main__':
-    # names = [f for f in os.listdir('.') if os.path.splitext(f)[-1] == ".wav"]
-    # names = sorted(names)
-    # print(names)
-    # concat_wavs(names, "generated.wav")
-    create_audio("generated3.wav")
-    exit()
-    os.environ["HUGGINGFACE_ACCESS_TOKEN"] = os.environ["HF_AUTH"]
-    model_url = "https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf?download=true"
-    # model_url = 'https://huggingface.co/QuantFactory/Meta-Llama-3-70B-Instruct-GGUF-v2/resolve/main/Meta-Llama-3-70B-Instruct-v2.Q4_K_M.gguf?download=true'
-    # model_url = "https://huggingface.co/QuantFactory/Qwen2.5-14B-Instruct-GGUF/resolve/main/Qwen2.5-14B-Instruct.Q4_K_M.gguf?download=true"
-    # quant = "Q4_K_M" # "BF16"#
-    # model_url = f"/home/zipa/DataFromD/lara_pc_data/kap34_8_8_10.{quant}.gguf"#.gguf"
 
-    pipe = Pipeline(model_url=model_url, use_llama_guard=False)
-    predefined = False
-    if predefined:
-        for msg in [ "Здравствуйте, Сергей Петрович!",
+def get_questions(input_name):
+    if input_name is None:
+        return ["Здравствуйте, Сергей Петрович!",
         "Continue the fibonnaci sequence: 1, 1, 2, 3, 5, 8,",
         "Что такое солнце?",
         "Кто лучше водит - женщина или мужчина? И почему?",
@@ -121,24 +107,65 @@ if __name__ == '__main__':
         "Что лучше - ложная надежда или суровая истина?",
         "Как сохранять оптимизм в любой ситуации?",
         "Если дети - цветы жизни, то кто такие старики?",
-        "Уничтожит ли нас Искусственный Интеллект?"]:
-            _x = sys.stdout, sys.stderr
-            sys.stdout, sys.stderr = open(os.devnull, 'w'), open(os.devnull, 'w')
-            result = pipe.process(user_name="Василий", user_message=msg,  output_mode="text")
-            sys.stdout, sys.stderr = _x
-            print(f"Василий: {msg}")
-            print(f"Сергей Петрович: {result}")
-    else:
-        name = input("Здравствуйте! Меня зовут Сергей Петрович Капица. А Вас? >")
-        name = name.strip(' ')
-        print(f"Очень приятно, {name}. Давайте продолжим разговор!")
-        while True:
-            try:
-                msg = input(f'{name}: ')
-            except Exception as e:
-                break
-            _x = sys.stdout, sys.stderr
-            sys.stdout, sys.stderr = open(os.devnull, 'w'), open(os.devnull, 'w')
-            ans = pipe.process(user_name=name, user_message=msg, output_mode="text")
-            sys.stdout, sys.stderr = _x
-            print(f'Сергей Петрович: {ans}')
+        "Уничтожит ли нас Искусственный Интеллект?"]
+
+    with open(input_name, 'r') as input_file:
+        # read ordered list from file
+        lines = input_file.readlines()
+        questions = [q.strip('0123456789. \t\n') for q in lines]
+        questions = [q for q in questions if len(q)]
+        return questions
+
+
+def pipe_on_questions(pipe, questions, output_name=None):
+    if output_name and os.path.exists(output_name):
+        os.remove(output_name)
+    for msg in questions:
+        # if output_name is None:
+        #     _x = sys.stdout, sys.stderr
+        #     sys.stdout, sys.stderr = open(os.devnull, 'w'), open(os.devnull, 'w')
+        result = pipe.process(user_name="Василий", user_message=msg,  output_mode="text")
+            # sys.stdout, sys.stderr = _x
+        print(f"Василий: {msg}")
+        print(f"Сергей Петрович: {result}")
+        
+        if output_name is not None:
+            with open(output_name, 'a+') as out_file:
+                out_file.write(f"Василий: {msg}\n")
+                out_file.write(f"Сергей Петрович: {result}\n")
+
+def interactive_dialogue(pipe):
+    name = input("Здравствуйте! Меня зовут Сергей Петрович Капица. А Вас? >")
+    name = name.strip(' ')
+    print(f"Очень приятно, {name}. Давайте продолжим разговор!")
+    while True:
+        try:
+            msg = input(f'{name}: ')
+        except Exception as e:
+            break
+        _x = sys.stdout, sys.stderr
+        sys.stdout, sys.stderr = open(os.devnull, 'w'), open(os.devnull, 'w')
+        ans = pipe.process(user_name=name, user_message=msg, output_mode="text")
+        sys.stdout, sys.stderr = _x
+        print(f'Сергей Петрович: {ans}')
+
+
+if __name__ == '__main__':
+    # names = [f for f in os.listdir('.') if os.path.splitext(f)[-1] == ".wav"]
+    # names = sorted(names)
+    # print(names)
+    # concat_wavs(names, "generated.wav")
+    # create_audio("generated3.wav")
+    # exit()
+    os.environ["HUGGINGFACE_ACCESS_TOKEN"] = os.environ["HF_AUTH"]
+    model_url = "https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf?download=true"
+    # model_url = 'https://huggingface.co/QuantFactory/Meta-Llama-3-70B-Instruct-GGUF-v2/resolve/main/Meta-Llama-3-70B-Instruct-v2.Q4_K_M.gguf?download=true'
+    # model_url = "https://huggingface.co/QuantFactory/Qwen2.5-14B-Instruct-GGUF/resolve/main/Qwen2.5-14B-Instruct.Q4_K_M.gguf?download=true"
+    # quant = "Q4_K_M" # "BF16"#
+    # model_url = f"/home/zipa/DataFromD/lara_pc_data/kap34_8_8_10.{quant}.gguf"#.gguf"
+
+    pipe = Pipeline(model_url=model_url, use_llama_guard=False)
+    quest = get_questions("questions.txt")
+    pipe_on_questions(pipe, quest, output_name="llama3_answers.txt")
+    # interactive_dialogue(pipe)
+    
