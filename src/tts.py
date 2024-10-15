@@ -52,6 +52,8 @@ class TTSProcessor:
             tmp_filename = os.path.join(self.folder, tmp_filename)
         else:
             tmp_filename = output_name
+
+        # modified bits_per_sample for LipSync
         torchaudio.save(tmp_filename, torch.tensor(out["wav"]).unsqueeze(
-            0), 24_000, encoding="PCM_S", backend="soundfile")
+            0), 24_000, encoding="PCM_S", backend="soundfile", bits_per_sample=16)
         return tmp_filename
