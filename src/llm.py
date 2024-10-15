@@ -137,8 +137,6 @@ class LLMProcessor:
                                                      system_prompt=self.get_system_prompt(user_name) if not custom_system_prompt else custom_system_prompt)
         self.current_user = user_name
         
-        
-        
 
     def process_prompt(self, prompt, user_name):
         if user_name:

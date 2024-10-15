@@ -2,10 +2,13 @@ import sys
 import os
 import dotenv
 import torchaudio, torch
+import time
 os.system("pip install -U accelerate")
 from src.llm import LLMProcessor
 from src.tts import TTSProcessor
 from src.asr import ASRProcessor
+
+from utils.logger import logger, log_mode
 
 
 # load global variables from local .env file
@@ -16,7 +19,8 @@ class Pipeline:
     def __init__(self,
                  model_url=f"https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf",
                  use_llama_guard=False,
-                 output_folder=".generated"):
+                 output_folder=".generated",
+                 log_time = False):
         # model_url = "https://huggingface.co/QuantFactory/Meta-Llama-3.1-8B-GGUF/resolve/main/Meta-Llama-3.1-8B.Q4_K_M.gguf?download=true"
         hf_token = os.environ.get('HF_AUTH')
         self.asr = ASRProcessor(hf_token=hf_token)
@@ -26,13 +30,24 @@ class Pipeline:
             use_llama_guard=use_llama_guard)
         self.tts = TTSProcessor(os.environ.get(
             "AUDIO_PATH"), hf_token=hf_token, output_dir=output_folder)
+        global log_mode
+        if log_time:
+            log_mode = "s"
 
+    @logger
     def set_user(self, user_name):
+        if self.log_time:
+            _start = time.time_ns()
         self.llm.set_engine(user_name)
-
+        if self.log_time:
+            _end = time.time_ns()
+            print(f"{__class__.__name__}:{__name__} took {(_end - _start) / 1000} ms")
+    
+    @logger
     def save_context(self, user_name):
         self.llm.save_context(user_name)
 
+    @logger
     def process(self, user_name, file_to_process=None, user_message=None, output_mode='audio'):
         assert ((file_to_process is None) ^ (user_message is None))
         self.llm.set_engine(user_name, reset=True)
@@ -137,7 +152,7 @@ def pipe_on_questions(pipe, questions, output_name=None):
                 out_file.write(f"Василий: {msg}\n")
                 out_file.write(f"Сергей Петрович: {result}\n")
 
-def interactive_dialogue(pipe):
+def interactive_dialogue(pipe, log=True):
     name = input("Здравствуйте! Меня зовут Сергей Петрович Капица. А Вас? >")
     name = name.strip(' ')
     print(f"Очень приятно, {name}. Давайте продолжим разговор!")
@@ -146,10 +161,12 @@ def interactive_dialogue(pipe):
             msg = input(f'{name}: ')
         except Exception as e:
             break
-        _x = sys.stdout, sys.stderr
-        sys.stdout, sys.stderr = open(os.devnull, 'w'), open(os.devnull, 'w')
+        if not log:
+            _x = sys.stdout, sys.stderr
+            sys.stdout, sys.stderr = open(os.devnull, 'w'), open(os.devnull, 'w')
         ans = pipe.process(user_name=name, user_message=msg, output_mode="text")
-        sys.stdout, sys.stderr = _x
+        if not log:
+            sys.stdout, sys.stderr = _x
         print(f'Сергей Петрович: {ans}')
 
 
@@ -167,8 +184,8 @@ if __name__ == '__main__':
     quant = "Q4_K_M" # "BF16"#
     model_url=f"https://huggingface.co/kzipa/kap34_8_8_10/resolve/main/kap34_8_8_10.{quant}.gguf?download=true"
 
-    pipe = Pipeline(model_url=model_url, use_llama_guard=False)
-    quest = get_questions("questions.txt")
+    pipe = Pipeline(model_url=model_url, use_llama_guard=False, log_time=True)
+    # quest = get_questions("questions.txt")
     # pipe_on_questions(pipe, quest, output_name="llama3_answers.txt")
-    interactive_dialogue(pipe)
+    interactive_dialogue(pipe, log=True)
     

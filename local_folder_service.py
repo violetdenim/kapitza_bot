@@ -41,6 +41,6 @@ if __name__ == "__main__":
     filenames_queue = Queue()
     
     PipelineThread(filenames_queue, None, timeout=None,
-    pipeline_args={"output_folder" : output_folder, "model_url": model_url, "use_llama_guard": use_llama_guard}).start()
+    pipeline_args={"output_folder" : output_folder, "model_url": model_url, "use_llama_guard": use_llama_guard, "log_time": True}).start()
     FolderMonitor(filenames_queue, input_folder=input_folder, check_freq=1.0).start()
     filenames_queue.join()
