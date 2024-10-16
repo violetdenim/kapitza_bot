@@ -6,10 +6,12 @@ from TTS.tts.configs.xtts_config import XttsConfig
 from TTS.tts.models.xtts import Xtts
 import tempfile
 from git import Repo
+from utils.logger import UsualLoggedClass
 
 
-class TTSProcessor:
+class TTSProcessor(UsualLoggedClass):
     def __init__(self, checkpoint_path, hf_token=os.environ.get("HF_AUTH"), output_dir='.generated'):
+        super().__init__()
         self.folder = output_dir
         if os.path.exists(self.folder):
             for f in os.listdir(self.folder):

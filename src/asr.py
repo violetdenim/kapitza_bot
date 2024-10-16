@@ -3,9 +3,12 @@ from pyannote.audio import Model as VADModel
 from pyannote.audio.pipelines import VoiceActivityDetection
 import torch, torchaudio, os
 import time
+from utils.logger import UsualLoggedClass
 
-class ASRProcessor:
+class ASRProcessor(UsualLoggedClass):
     def __init__(self, model_id="openai/whisper-large-v3", hf_token=os.environ.get('HF_AUTH')) -> None:
+        # use this interface to enable\disable logging on application level
+        super().__init__()
         device = "cuda:0" if torch.cuda.is_available() else "cpu"
         torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
         model = AutoModelForSpeechSeq2Seq.from_pretrained(

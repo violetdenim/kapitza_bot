@@ -39,8 +39,9 @@ if __name__ == "__main__":
         os.remove(os.path.join(input_folder, f))
     
     filenames_queue = Queue()
-    
+    from utils.logger import logger
+    logger.log_mode = "s"
     PipelineThread(filenames_queue, None, timeout=None,
-    pipeline_args={"output_folder" : output_folder, "model_url": model_url, "use_llama_guard": use_llama_guard, "log_time": True}).start()
+    pipeline_args={"output_folder" : output_folder, "model_url": model_url, "use_llama_guard": use_llama_guard}).start()
     FolderMonitor(filenames_queue, input_folder=input_folder, check_freq=1.0).start()
     filenames_queue.join()

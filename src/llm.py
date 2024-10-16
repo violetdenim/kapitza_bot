@@ -9,6 +9,11 @@ from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.llms.llama_cpp import LlamaCPP
 from llama_index.llms.llama_cpp.llama_utils import ( messages_to_prompt_v3_instruct, completion_to_prompt_v3_instruct)
 
+import os, datetime
+# tool to normalize model's output
+from runorm import RUNorm
+from .utils import *
+from utils.logger import UsualLoggedClass
 
 def completion_to_prompt_qwen(completion):
    return f"<|im_start|>system\n<|im_end|>\n<|im_start|>user\n{completion}<|im_end|>\n<|im_start|>assistant\n"
@@ -30,17 +35,13 @@ def messages_to_prompt_qwen(messages):
 
     return prompt
 
-import os, datetime
-# tool to normalize model's output
-from runorm import RUNorm
-from .utils import *
-
-class LLMProcessor:
+class LLMProcessor(UsualLoggedClass):
     def __init__(self, prompt_path, rag_folder,
                  embedding_name='BAAI/bge-m3',# 'deepvk/USER-bge-m3' #'intfloat/multilingual-e5-large-instruct' #"BAAI/bge-base-en-v1.5"
                  model_url="https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf?download=true",
                  use_llama_guard=False
                  ):
+        super().__init__()
         documents = SimpleDirectoryReader(rag_folder, recursive=True).load_data() # "data"
         Settings.embed_model = HuggingFaceEmbedding(model_name=embedding_name)
         if not model_url.startswith("http"):

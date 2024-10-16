@@ -8,19 +8,20 @@ from src.llm import LLMProcessor
 from src.tts import TTSProcessor
 from src.asr import ASRProcessor
 
-from utils.logger import logger, log_mode
+from utils.logger import UsualLoggedClass 
 
 
 # load global variables from local .env file
 dotenv.load_dotenv()
 
 
-class Pipeline:
+class Pipeline(UsualLoggedClass):
     def __init__(self,
                  model_url=f"https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf",
                  use_llama_guard=False,
-                 output_folder=".generated",
-                 log_time = False):
+                 output_folder=".generated"):
+                 
+        super().__init__()
         # model_url = "https://huggingface.co/QuantFactory/Meta-Llama-3.1-8B-GGUF/resolve/main/Meta-Llama-3.1-8B.Q4_K_M.gguf?download=true"
         hf_token = os.environ.get('HF_AUTH')
         self.asr = ASRProcessor(hf_token=hf_token)
@@ -29,25 +30,14 @@ class Pipeline:
             model_url=model_url,
             use_llama_guard=use_llama_guard)
         self.tts = TTSProcessor(os.environ.get(
-            "AUDIO_PATH"), hf_token=hf_token, output_dir=output_folder)
-        global log_mode
-        if log_time:
-            log_mode = "s"
+            "AUDIO_PATH"), hf_token=hf_token, output_dir=output_folder)    
 
-    @logger
     def set_user(self, user_name):
-        if self.log_time:
-            _start = time.time_ns()
         self.llm.set_engine(user_name)
-        if self.log_time:
-            _end = time.time_ns()
-            print(f"{__class__.__name__}:{__name__} took {(_end - _start) / 1000} ms")
     
-    @logger
     def save_context(self, user_name):
         self.llm.save_context(user_name)
 
-    @logger
     def process(self, user_name, file_to_process=None, user_message=None, output_mode='audio'):
         assert ((file_to_process is None) ^ (user_message is None))
         self.llm.set_engine(user_name, reset=True)
@@ -62,7 +52,6 @@ class Pipeline:
         if output_mode == "text":
             return answer
         return self.tts.get_audio(answer, format=".wav" if output_mode == "audio" else ".ogg")
-
 
 def concat_wavs(inputs, output):
     x = []
@@ -169,8 +158,11 @@ def interactive_dialogue(pipe, log=True):
             sys.stdout, sys.stderr = _x
         print(f'Сергей Петрович: {ans}')
 
-
 if __name__ == '__main__':
+    # use this interface to enable\disable logging on application level
+    from utils.logger import logger
+    logger.log_mode = "s"
+
     # names = [f for f in os.listdir('.') if os.path.splitext(f)[-1] == ".wav"]
     # names = sorted(names)
     # print(names)
@@ -183,8 +175,8 @@ if __name__ == '__main__':
     # model_url = "https://huggingface.co/QuantFactory/Qwen2.5-14B-Instruct-GGUF/resolve/main/Qwen2.5-14B-Instruct.Q4_K_M.gguf?download=true"
     quant = "Q4_K_M" # "BF16"#
     model_url=f"https://huggingface.co/kzipa/kap34_8_8_10/resolve/main/kap34_8_8_10.{quant}.gguf?download=true"
-
-    pipe = Pipeline(model_url=model_url, use_llama_guard=False, log_time=True)
+    # enable logging
+    pipe = Pipeline(model_url=model_url, use_llama_guard=False)
     # quest = get_questions("questions.txt")
     # pipe_on_questions(pipe, quest, output_name="llama3_answers.txt")
     interactive_dialogue(pipe, log=True)
