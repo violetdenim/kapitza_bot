@@ -38,7 +38,7 @@ class Pipeline(UsualLoggedClass):
     def save_context(self, user_name):
         self.llm.save_context(user_name)
 
-    def process(self, user_name, file_to_process=None, user_message=None, output_mode='audio'):
+    def process(self, user_name, file_to_process=None, user_message=None, output_mode='audio', output_name=None):
         assert ((file_to_process is None) ^ (user_message is None))
         self.llm.set_engine(user_name, reset=True)
         if user_message is None:
@@ -51,7 +51,7 @@ class Pipeline(UsualLoggedClass):
             answer = self.llm.process_prompt(user_message, user_name)
         if output_mode == "text":
             return answer
-        return self.tts.get_audio(answer, format=".wav" if output_mode == "audio" else ".ogg")
+        return self.tts.get_audio(answer, format=".wav" if output_mode == "audio" else ".ogg", output_name=output_name)
 
 def concat_wavs(inputs, output):
     x = []

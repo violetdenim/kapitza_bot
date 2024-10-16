@@ -36,7 +36,7 @@ class PipelineThread(threading.Thread):
         self.input = input
         self.output = output
         self.timeout = timeout
-        self.processor = Pipeline(**pipeline_args)#output_folder=pipeline_folder)
+        self.processor = Pipeline(**pipeline_args)
         # variable to store current username, expect user answer as result
         self.username = None
 
@@ -56,10 +56,13 @@ class PipelineThread(threading.Thread):
                 continue
 
             print("Got from queue:", input_file_name)
-            if os.path.split(input_file_name)[-1] == "newuser":
+            _name = os.path.split(input_file_name)[-1]
+            # use same names in output as in input
+            target_name = os.path.join(self.processor.tts.folder, os.path.splitext(_name)[0] + ".wav")
+            if _name == "newuser":
                 # initiate new protocol, ask user his name
                 self.username = None
-                output_file_name = self.processor.tts.get_audio("Здравствуйте, меня зовут Сергей Капица! Представьтесь, пожалуйста.")
+                output_file_name = self.processor.tts.get_audio("Здравствуйте, меня зовут Сергей Капица! Представьтесь, пожалуйста.", output_name=target_name)
             else:
                 if self.username is None: # expect user name as an answer
                     user_answer = self.processor.asr.get_text(input_file_name)
@@ -74,9 +77,10 @@ class PipelineThread(threading.Thread):
                     # self.username = self.processor.llm.process_prompt(user_answer, user_name="user")
                     # print(f"System concluded: {user_answer}")
                     self.processor.set_user(self.username)
-                    output_file_name = self.processor.tts.get_audio(f"{self.username}, приятно познакомиться")
+                    output_file_name = self.processor.tts.get_audio(f"{self.username}, приятно познакомиться", output_name=target_name)
                 else:
-                    output_file_name = self.processor.process(user_name=self.username, file_to_process=input_file_name)
+                    output_file_name = self.processor.process(user_name=self.username, file_to_process=input_file_name, output_name=target_name)
+            assert(output_file_name == target_name)
             if self.output:
                 if output_file_name is not None:
                     self.output.put(output_file_name)
