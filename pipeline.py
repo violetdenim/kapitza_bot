@@ -19,7 +19,8 @@ class Pipeline(UsualLoggedClass):
     def __init__(self,
                  model_url=f"https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf",
                  use_llama_guard=False,
-                 output_folder=".generated"):
+                 output_folder=".generated",
+                 prepare_for_audio=True):
                  
         super().__init__()
         # model_url = "https://huggingface.co/QuantFactory/Meta-Llama-3.1-8B-GGUF/resolve/main/Meta-Llama-3.1-8B.Q4_K_M.gguf?download=true"
@@ -28,7 +29,8 @@ class Pipeline(UsualLoggedClass):
         self.llm = LLMProcessor(os.environ.get(
             "PROMPT_PATH"), os.environ.get("RAG_PATH"),
             model_url=model_url,
-            use_llama_guard=use_llama_guard)
+            use_llama_guard=use_llama_guard,
+            prepare_for_audio=prepare_for_audio)
         self.tts = TTSProcessor(os.environ.get(
             "AUDIO_PATH"), hf_token=hf_token, output_dir=output_folder)    
 
@@ -161,7 +163,7 @@ def interactive_dialogue(pipe, log=True):
 if __name__ == '__main__':
     # use this interface to enable\disable logging on application level
     from utils.logger import logger
-    logger.log_mode = "s"
+    logger.log_mode = None
 
     # names = [f for f in os.listdir('.') if os.path.splitext(f)[-1] == ".wav"]
     # names = sorted(names)
@@ -170,14 +172,14 @@ if __name__ == '__main__':
     # create_audio("generated3.wav")
     # exit()
     os.environ["HUGGINGFACE_ACCESS_TOKEN"] = os.environ["HF_AUTH"]
-    # model_url = "https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf?download=true"
+    model_url = "https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf?download=true"
     # model_url = 'https://huggingface.co/QuantFactory/Meta-Llama-3-70B-Instruct-GGUF-v2/resolve/main/Meta-Llama-3-70B-Instruct-v2.Q4_K_M.gguf?download=true'
     # model_url = "https://huggingface.co/QuantFactory/Qwen2.5-14B-Instruct-GGUF/resolve/main/Qwen2.5-14B-Instruct.Q4_K_M.gguf?download=true"
-    quant = "Q4_K_M" # "BF16"#
-    model_url=f"https://huggingface.co/kzipa/kap34_8_8_10/resolve/main/kap34_8_8_10.{quant}.gguf?download=true"
+    # quant = "Q4_K_M" # "BF16"#
+    # model_url=f"https://huggingface.co/kzipa/kap34_8_8_10/resolve/main/kap34_8_8_10.{quant}.gguf?download=true"
     # enable logging
-    pipe = Pipeline(model_url=model_url, use_llama_guard=False)
+    pipe = Pipeline(model_url=model_url, use_llama_guard=False, prepare_for_audio=False)
     # quest = get_questions("questions.txt")
     # pipe_on_questions(pipe, quest, output_name="llama3_answers.txt")
-    interactive_dialogue(pipe, log=True)
+    interactive_dialogue(pipe, log=False)
     

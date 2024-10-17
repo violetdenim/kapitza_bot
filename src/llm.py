@@ -39,8 +39,11 @@ class LLMProcessor(UsualLoggedClass):
     def __init__(self, prompt_path, rag_folder,
                  embedding_name='BAAI/bge-m3',# 'deepvk/USER-bge-m3' #'intfloat/multilingual-e5-large-instruct' #"BAAI/bge-base-en-v1.5"
                  model_url="https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf?download=true",
-                 use_llama_guard=False
+                 use_llama_guard=False, prepare_for_audio=True
                  ):
+        """
+        prepare_for_audio specifies whether to apply postprocessing or not
+        """
         super().__init__()
         documents = SimpleDirectoryReader(rag_folder, recursive=True).load_data() # "data"
         Settings.embed_model = HuggingFaceEmbedding(model_name=embedding_name)
@@ -88,9 +91,12 @@ class LLMProcessor(UsualLoggedClass):
         self.current_user = None
         self.prompt = None
         self.prompt_path = prompt_path
-        self.normalizer = RUNorm()
-        self.normalizer.load(model_size="big", device="cpu")
-        self.postprocessing_fn = lambda x: self.normalizer.norm(drop_ending(strip_substr(x, ['assistant', ' ', '\n'])))
+        if prepare_for_audio:
+            self.normalizer = RUNorm()
+            self.normalizer.load(model_size="big", device="cpu")
+            self.postprocessing_fn = lambda x: self.normalizer.norm(drop_ending(strip_substr(x, ['assistant', ' ', '\n'])))
+        else:
+            self.postprocessing_fn = lambda x: drop_ending(strip_substr(x, ['assistant', ' ', '\n']))
         if use_llama_guard:
             from llama_index.core.llama_pack import download_llama_pack
             LlamaGuardModeratorPack = download_llama_pack("LlamaGuardModeratorPack")#, "../llamaguard_pack")
@@ -131,8 +137,7 @@ class LLMProcessor(UsualLoggedClass):
                 print("Creating new chat store")
         else:
             return
-        chat_memory = ChatMemoryBuffer.from_defaults(token_limit=4096,
-                                                     chat_store=self.chat_store, chat_store_key=user_name)
+        chat_memory = ChatMemoryBuffer.from_defaults(token_limit=4096, chat_store=self.chat_store, chat_store_key=user_name)
         self.chat_engine = self.index.as_chat_engine(chat_mode="condense_plus_context",
                                                      memory=chat_memory,
                                                      system_prompt=self.get_system_prompt(user_name) if not custom_system_prompt else custom_system_prompt)
