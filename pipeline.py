@@ -40,8 +40,9 @@ class Pipeline(UsualLoggedClass):
     def save_context(self, user_name):
         self.llm.save_context(user_name)
 
-    def process(self, user_name, file_to_process=None, user_message=None, output_mode='audio', output_name=None):
+    def process(self, user_name, file_to_process=None, user_message=None, output_mode='audio', output_name=None, stream=False):
         assert ((file_to_process is None) ^ (user_message is None))
+        assert((output_mode == "text") or (self.tts))
         self.llm.set_engine(user_name, reset=True)
         if user_message is None and self.asr:
             user_message = self.asr.get_text(file_to_process)
@@ -49,13 +50,17 @@ class Pipeline(UsualLoggedClass):
             return None
         if len(user_message) == 0:
             return None, "Прошу прощения, не расслышал."
+        if not stream:
+            sentence = self.llm.process_prompt(user_message, user_name, stream=False)
+            if output_mode == "text":
+                return sentence
+            return self.tts.get_audio(sentence, format=".wav" if output_mode == "audio" else ".ogg", output_name=output_name)
         else:
-            answer = self.llm.process_prompt(user_message, user_name)
-        if output_mode == "text":
-            return answer
-        if not self.tts:
-            return None
-        return self.tts.get_audio(answer, format=".wav" if output_mode == "audio" else ".ogg", output_name=output_name)
+            for sentence in self.llm.process_prompt(user_message, user_name, stream=True):
+                if output_mode == "text":
+                    yield sentence
+                else:
+                    yield self.tts.get_audio(sentence, format=".wav" if output_mode == "audio" else ".ogg", output_name=output_name)
 
 def concat_wavs(inputs, output):
     x = []
@@ -145,7 +150,7 @@ def pipe_on_questions(pipe, questions, output_name=None):
                 out_file.write(f"Василий: {msg}\n")
                 out_file.write(f"Сергей Петрович: {result}\n")
 
-def interactive_dialogue(pipe, log=True):
+def interactive_dialogue(pipe):
     print('\n' * 100)
     name = input("Здравствуйте! Меня зовут Сергей Петрович Капица. А Вас? >")
     name = name.strip(' ')
@@ -155,13 +160,11 @@ def interactive_dialogue(pipe, log=True):
             msg = input(f'{name}: ')
         except Exception as e:
             break
-        if not log:
-            _x = sys.stdout, sys.stderr
-            sys.stdout, sys.stderr = open(os.devnull, 'w'), open(os.devnull, 'w')
-        ans = pipe.process(user_name=name, user_message=msg, output_mode="text")
-        if not log:
-            sys.stdout, sys.stderr = _x
-        print(f'Сергей Петрович: {ans}')
+        print('Сергей Петрович: ', end="", flush=True)
+        for sentence in pipe.process(user_name=name, user_message=msg, output_mode="text", stream=True):
+            print(sentence + " ", end="", flush=True)
+        print()
+        # print(f'Сергей Петрович: {ans}')
 
 if __name__ == '__main__':
     # use this interface to enable\disable logging on application level
@@ -188,5 +191,5 @@ if __name__ == '__main__':
     pipe = Pipeline(model_url=model_url, use_llama_guard=False, prepare_for_audio=False)
     # quest = get_questions("questions.txt")
     # pipe_on_questions(pipe, quest, output_name="llama3_answers.txt")
-    interactive_dialogue(pipe, log=False)
+    interactive_dialogue(pipe)
     

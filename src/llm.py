@@ -132,7 +132,7 @@ class LLMProcessor(UsualLoggedClass):
                 # transform inputs into Llama2 format
                 messages_to_prompt=messages_to_prompt_v3_instruct, # messages_to_prompt_qwen,
                 completion_to_prompt=completion_to_prompt_v3_instruct, # completion_to_prompt_qwen,
-                verbose=True,
+                verbose=False,
             )
         else:
             Settings.llm = HuggingFaceLLM(
@@ -188,18 +188,15 @@ class LLMProcessor(UsualLoggedClass):
         if user_name and reset and os.path.exists(user_name + ".json"):
             os.remove(user_name + ".json")
             self.chat_store = SimpleChatStore()
-            print("Creating new chat store")
         elif not user_name or user_name != self.current_user:
             if self.current_user is not None:
                 self.chat_store.persist(persist_path=self.current_user + ".json")
             if user_name is not None and os.path.exists(user_name + ".json"):
                 self.chat_store = SimpleChatStore.from_persist_path(persist_path=user_name + ".json")
-                print(f"Creating {user_name} chat store")
             else:
                 self.chat_store = SimpleChatStore()
                 if user_name is None:
                     user_name = "user" # for technical usage of pipeline
-                print("Creating new chat store")
         else:
             return
         chat_memory = ChatMemoryBuffer.from_defaults(token_limit=4096, chat_store=self.chat_store, chat_store_key=user_name)
