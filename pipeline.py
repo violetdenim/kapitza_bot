@@ -25,14 +25,14 @@ class Pipeline(UsualLoggedClass):
         super().__init__()
         # model_url = "https://huggingface.co/QuantFactory/Meta-Llama-3.1-8B-GGUF/resolve/main/Meta-Llama-3.1-8B.Q4_K_M.gguf?download=true"
         hf_token = os.environ.get('HF_AUTH')
-        self.asr = ASRProcessor(hf_token=hf_token)
-        self.llm = LLMProcessor(os.environ.get(
-            "PROMPT_PATH"), os.environ.get("RAG_PATH"),
-            model_url=model_url,
-            use_llama_guard=use_llama_guard,
-            prepare_for_audio=prepare_for_audio)
-        self.tts = TTSProcessor(os.environ.get(
-            "AUDIO_PATH"), hf_token=hf_token, output_dir=output_folder)    
+        if prepare_for_audio:
+            self.asr = ASRProcessor(hf_token=hf_token)
+            self.tts = TTSProcessor(os.environ.get("AUDIO_PATH"), hf_token=hf_token, output_dir=output_folder)    
+        else:
+            self.asr = None
+            self.tts = None
+        self.llm = LLMProcessor(os.environ.get("PROMPT_PATH"), os.environ.get("RAG_PATH"),
+                model_url=model_url, use_llama_guard=use_llama_guard, prepare_for_audio=prepare_for_audio)
 
     def set_user(self, user_name):
         self.llm.set_engine(user_name)
@@ -43,7 +43,7 @@ class Pipeline(UsualLoggedClass):
     def process(self, user_name, file_to_process=None, user_message=None, output_mode='audio', output_name=None):
         assert ((file_to_process is None) ^ (user_message is None))
         self.llm.set_engine(user_name, reset=True)
-        if user_message is None:
+        if user_message is None and self.asr:
             user_message = self.asr.get_text(file_to_process)
         if user_message is None: # invalid input path, just skip
             return None
@@ -53,6 +53,8 @@ class Pipeline(UsualLoggedClass):
             answer = self.llm.process_prompt(user_message, user_name)
         if output_mode == "text":
             return answer
+        if not self.tts:
+            return None
         return self.tts.get_audio(answer, format=".wav" if output_mode == "audio" else ".ogg", output_name=output_name)
 
 def concat_wavs(inputs, output):
@@ -144,6 +146,7 @@ def pipe_on_questions(pipe, questions, output_name=None):
                 out_file.write(f"Сергей Петрович: {result}\n")
 
 def interactive_dialogue(pipe, log=True):
+    print('\n' * 100)
     name = input("Здравствуйте! Меня зовут Сергей Петрович Капица. А Вас? >")
     name = name.strip(' ')
     print(f"Очень приятно, {name}. Давайте продолжим разговор!")
@@ -172,11 +175,15 @@ if __name__ == '__main__':
     # create_audio("generated3.wav")
     # exit()
     os.environ["HUGGINGFACE_ACCESS_TOKEN"] = os.environ["HF_AUTH"]
+    # os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+    # model_url = "https://huggingface.co/QuantFactory/Meta-Llama-3.1-8B-GGUF/resolve/main/Meta-Llama-3.1-8B.Q4_K_M.gguf?download=true"
     model_url = "https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf?download=true"
     # model_url = 'https://huggingface.co/QuantFactory/Meta-Llama-3-70B-Instruct-GGUF-v2/resolve/main/Meta-Llama-3-70B-Instruct-v2.Q4_K_M.gguf?download=true'
     # model_url = "https://huggingface.co/QuantFactory/Qwen2.5-14B-Instruct-GGUF/resolve/main/Qwen2.5-14B-Instruct.Q4_K_M.gguf?download=true"
     # quant = "Q4_K_M" # "BF16"#
     # model_url=f"https://huggingface.co/kzipa/kap34_8_8_10/resolve/main/kap34_8_8_10.{quant}.gguf?download=true"
+
+    # model_url = "unsloth/Llama-3.2-11B-Vision-Instruct"
     # enable logging
     pipe = Pipeline(model_url=model_url, use_llama_guard=False, prepare_for_audio=False)
     # quest = get_questions("questions.txt")
