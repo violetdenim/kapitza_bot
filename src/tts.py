@@ -47,15 +47,13 @@ class TTSProcessor(UsualLoggedClass):
 
     def get_audio(self, text, format=".wav", output_name=None):
         out = self.model.inference(text=text, language='ru', gpt_cond_latent=self.gpt_cond_latent, speaker_embedding=self.speaker_embedding,
-                                   temperature=0.2, repetition_penalty=10.0, top_k=50, top_p=0.85,
-                                   speed=0.95,
+                                   temperature=0.2, repetition_penalty=10.0, top_k=50, top_p=0.85, speed=0.95,
                                    enable_text_splitting=True)
         if output_name is None:
             tmp_filename = next(tempfile._get_candidate_names()) + format
             tmp_filename = os.path.join(self.folder, tmp_filename)
         else:
             tmp_filename = output_name
-
         # modified bits_per_sample for LipSync
         torchaudio.save(tmp_filename, torch.tensor(out["wav"]).unsqueeze(
             0), 24_000, encoding="PCM_S", backend="soundfile", bits_per_sample=16)
@@ -74,16 +72,15 @@ class TTSThread(threading.Thread):
 
     def run(self):
         while True:
-            text, output_name = None, None
             package = self.input.get(block = True)
             if isinstance(package, int) and package == 9: # kill
                 self.input.all_tasks_done()
                 return
 
-            if isinstance(package, tuple) or isinstance(package, list):
-                text, output_name = package
-            else:
-                text, output_name = package, None
-            result = self.engine.get_audio(text=text, output_name=output_name)
-            self.output.put(result)
+            assert(isinstance(package, tuple) or isinstance(package, list))
+            assert(len(package) == 3)    
+            text, format, output_name = package
+            result = self.engine.get_audio(text=text, format=format, output_name=output_name)
+            if self.output:
+                self.output.put(result)
             self.input.task_done()

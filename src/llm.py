@@ -235,6 +235,9 @@ class LLMProcessor(UsualLoggedClass):
             if token in ".?!":
                 yield self.postprocessing_fn(text)
                 text = ""
+                
+        if len(text):
+            yield self.postprocessing_fn(text)
 
 async def _async_test_demo():
     llm = LLMProcessor(os.environ.get("PROMPT_PATH"), os.environ.get("RAG_PATH"))

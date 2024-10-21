@@ -1,14 +1,13 @@
-import sys
 import os
 import dotenv
 import torchaudio, torch
-import time
 os.system("pip install -U accelerate")
 from src.llm import LLMProcessor
 from src.tts import TTSProcessor, TTSThread
 from src.asr import ASRProcessor
 from utils.logger import UsualLoggedClass 
 from queue import Queue
+
 # load global variables from local .env file
 dotenv.load_dotenv()
 
@@ -24,10 +23,13 @@ class Pipeline(UsualLoggedClass):
         hf_token = os.environ.get('HF_AUTH')
         if prepare_for_audio:
             self.asr = ASRProcessor(hf_token=hf_token)
-            self.tts = TTSProcessor(os.environ.get("AUDIO_PATH"), hf_token=hf_token, output_dir=output_folder)    
+            self.queue = Queue()
+            self.tts = TTSThread(self.queue, None, checkpoint_path=os.environ.get("AUDIO_PATH"), hf_token=hf_token, output_dir=output_folder)    
+            self.tts.start() # run in separate thread
         else:
             self.asr = None
             self.tts = None
+            self.queue = None
 
         self.llm = LLMProcessor(os.environ.get("PROMPT_PATH"), os.environ.get("RAG_PATH"),
                 model_url=model_url, use_llama_guard=use_llama_guard, prepare_for_audio=prepare_for_audio)
@@ -71,12 +73,20 @@ class Pipeline(UsualLoggedClass):
             if output_mode == "text":
                 yield sentence
             else:
+                # put to TTS Queue
                 iteration_name = None
                 if output_name:
                     name, ext = os.path.splitext(output_name)
                     iteration_name = name + "_" + str(index) + ext
-                yield self.tts.get_audio(sentence, format=".wav" if output_mode == "audio" else ".ogg", output_name=iteration_name)
+                if len(sentence) < 5: # at least two letters
+                    print(f"Attention! Short sentence `{sentence}` is passed to TTS")
+                self.queue.put([sentence, ".wav" if output_mode == "audio" else ".ogg", iteration_name])
+                yield None # do nothing, second process will do generation and put it to folder
             index += 1
+
+    def __exit__(self):
+        self.queue.put(9) # killing signal
+        self.queue.join() # wait for all processing to finish
 
 
 def concat_wavs(inputs, output):
@@ -90,6 +100,7 @@ def concat_wavs(inputs, output):
     torchaudio.save(output, x, rate, encoding="PCM_S", backend="soundfile")
 
 def create_audio(output):
+    print('...')
     tts = TTSProcessor(os.environ.get("AUDIO_PATH"), hf_token=os.environ.get('HF_AUTH'))
     
     # texts = ["""ОчевИИдное с Сергеем Капитсей.
@@ -117,7 +128,7 @@ def create_audio(output):
     #         tts.get_audio(text, format=".wav", output_name=name)
             
     # concat_wavs(names, output)
-    tts.get_audio("""генеративную маску""", format=".wav", output_name=output)
+    print(tts.get_audio("""Hi, Jane! My name is Sergey Kapitsa. I am inspired by the latest achievements of science, and you?""", format=".wav", output_name=output))
     
 
 def _get_questions(input_name):
@@ -199,13 +210,17 @@ async def _interactive_demo(use_questions=False, output_mode="text"):
     os.environ["HUGGINGFACE_ACCESS_TOKEN"] = os.environ["HF_AUTH"]
     # os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
     # model_url = "https://huggingface.co/QuantFactory/Meta-Llama-3.1-8B-GGUF/resolve/main/Meta-Llama-3.1-8B.Q4_K_M.gguf?download=true"
+
     model_url = "https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf?download=true"
+    # model_url = "https://huggingface.co/ruslandev/llama-3-8b-gpt-4o-ru1.0-gguf/resolve/main/ggml-model-Q4_K_M.gguf?download=true"
+    # model_url = "https://huggingface.co/QuantFactory/suzume-llama-3-8B-multilingual-GGUF/resolve/main/suzume-llama-3-8B-multilingual.Q4_K_M.gguf?download=true"
     # model_url = 'https://huggingface.co/QuantFactory/Meta-Llama-3-70B-Instruct-GGUF-v2/resolve/main/Meta-Llama-3-70B-Instruct-v2.Q4_K_M.gguf?download=true'
     # model_url = "https://huggingface.co/QuantFactory/Qwen2.5-14B-Instruct-GGUF/resolve/main/Qwen2.5-14B-Instruct.Q4_K_M.gguf?download=true"
     # quant = "Q4_K_M" # "BF16"#
     # model_url=f"https://huggingface.co/kzipa/kap34_8_8_10/resolve/main/kap34_8_8_10.{quant}.gguf?download=true"
 
     # model_url = "unsloth/Llama-3.2-11B-Vision-Instruct"
+    
     pipe = Pipeline(model_url=model_url, use_llama_guard=False, prepare_for_audio=(output_mode != "text") )
     if use_questions:
         quest = _get_questions("questions.txt")
@@ -214,6 +229,7 @@ async def _interactive_demo(use_questions=False, output_mode="text"):
         await _interactive_dialogue(pipe, output_mode=output_mode)
 
 if __name__ == '__main__':
+    # create_audio("english_test.wav")
     import asyncio
     asyncio.run(_interactive_demo(use_questions=False, output_mode="audio"))
     
