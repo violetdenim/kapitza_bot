@@ -45,20 +45,22 @@ RUN pip install torch torchaudio
 # CMD python -c "import torch; print(torch.cuda.is_available())"
 # RUN pip install -r requirements.txt
 RUN pip install flash_attn python-dotenv python-telegram-bot gitpython runorm
-RUN pip install llama-index llama-index-embeddings-huggingface llama-index-llms-huggingface
+RUN pip install llama-index llama-index-embeddings-huggingface 
 RUN pip install --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu121 llama-cpp-python 
-RUN pip install llama-index-llms-llama_cpp
+RUN pip install llama-index-llms-llama_cpp 
 RUN pip install TTS pyannote.audio accelerate
 COPY . .
 RUN pip install huggingface_hub
 RUN python hf_login.py
 RUN git config --global credential.helper store
-RUN apt-get install git-lfs & apt-get install ubuntu-restricted-extras
+RUN apt-get install git-lfs
 RUN git lfs install
 
 # install audio packages
-RUN apt-get update && apt-get install -y portaudio19-dev python3-pyaudio
-RUN pip install pyaudio wave argparse
-
+# RUN apt-get install ubuntu-restricted-extras
+# RUN apt-get update && apt-get install -y portaudio19-dev python3-pyaudio
+# RUN pip install pyaudio wave
+RUN pip install argparse
+RUN pip install llama-index-llms-huggingface
 # ENTRYPOINT ["conda", "run", "--no-capture-output", "-n", "kap_env", "python", "run.py"]
 # CMD python run.py
