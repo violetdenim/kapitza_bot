@@ -39,12 +39,29 @@ class OneThreadProcessor:
                                 print(f"Couldn't fetch username: {user_answer} from file {input_file_name}. Setting name to Дорогой друг")
                                 self.username = "Дорогой друг"
                             else:
+                                # user_answer = user_answer.strip(".,! ").capitalize()
+                                custom_prompt = custom_prompt = """Ты - система аутентификации для ASR. Пользователя просили представиться. Выведи в ответ только его или её имя в именительном (звательном) падеже и отчество, если он указал его.
+                                    Фамилию игнорируй, если пользователь специально не обозначил полное обращение. Если ввод нерелевантен, выведи !
+
+                                    Например:
+                                    Ввод: Андрюшей звать. Вывод: Андрюша.
+                                    Ввод: Меня зовут Катя. Вывод: Катя.
+                                    Ввод: Антоном меня звать. Вывод: Антон.
+                                    Ввод: Иван Петрович. Вывод: Иван Петрович.
+                                    Ввод: Меня зовут Амаяк Акопян. Вывод: Амаяк.
+                                    Ввод: Леди Гага. Вывод: Леди Гага.
+                                    Ввод: Джон Джонс. Вывод: Джон.
+                                    Ввод: Хуанг Ли Вьет. Вывод: Хуанг.
+                                    Ввод: Си Цзиньпин. Вывод: Цзиньпин.
+                                    Ввод: Меня зовут Патель. Вывод: Патель.
+                                    Ввод: Иван Мухин. Только так и никак иначе. Вывод: Иван Мухин.
+                                    Ввод: Мухин Иван. Я люблю свою фамилию. Вывод: Иван Мухин.
+                                    """
+                                self.processor.llm.set_engine(user_name=None, reset=True, custom_system_prompt=custom_prompt)
+                                user_answer = self.processor.llm.chat_engine.chat(user_answer).response
                                 user_answer = user_answer.strip(".,! ").capitalize()
                                 print(f"User answered: {user_answer}")
                                 self.username = user_answer
-                            # self.processor.llm.set_engine(user_name=None, reset=True, custom_system_prompt="""Ты - система аутентификации для ASR. Пользователя просили представиться. Выведи в ответ только его имя.""")
-                            # self.username = self.processor.llm.process_prompt(user_answer, user_name="user")
-                            # print(f"System concluded: {user_answer}")
                             self.processor.set_user(self.username)
                             output_file_name = self.processor.tts.get_audio(f"{self.username}, приятно познакомиться", output_name=target_name)
                         else:
