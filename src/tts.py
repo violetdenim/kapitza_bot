@@ -1,12 +1,13 @@
 import torch
 import torchaudio
 import os
-import TTS
 from TTS.tts.configs.xtts_config import XttsConfig
 from TTS.tts.models.xtts import Xtts
 import tempfile
 from git import Repo
 from utils.logger import UsualLoggedClass
+from queue import Queue
+import threading
 
 
 class TTSProcessor(UsualLoggedClass):
@@ -59,3 +60,30 @@ class TTSProcessor(UsualLoggedClass):
         torchaudio.save(tmp_filename, torch.tensor(out["wav"]).unsqueeze(
             0), 24_000, encoding="PCM_S", backend="soundfile", bits_per_sample=16)
         return tmp_filename
+
+
+# retrieves sentences from one queue and pushes audio into another
+class TTSThread(threading.Thread):
+    """ Thread accepts audio files using socket and puts their names into queue"""
+
+    def __init__(self, input: Queue, output: Queue, **params):
+        threading.Thread.__init__(self)
+        self.input = input
+        self.engine = TTSProcessor(**params)
+        self.output = output
+
+    def run(self):
+        while True:
+            text, output_name = None, None
+            package = self.input.get(block = True)
+            if isinstance(package, int) and package == 9: # kill
+                self.input.all_tasks_done()
+                return
+
+            if isinstance(package, tuple) or isinstance(package, list):
+                text, output_name = package
+            else:
+                text, output_name = package, None
+            result = self.engine.get_audio(text=text, output_name=output_name)
+            self.output.put(result)
+            self.input.task_done()

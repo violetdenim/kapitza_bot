@@ -213,9 +213,19 @@ class LLMProcessor(UsualLoggedClass):
             moderator_response_for_input = self.llamaguard_pack.run(prompt)
             if moderator_response_for_input != "safe":
                 return "Пожалуй, лучше поговорить на другую тему."
-        if not stream:
-            response = self.chat_engine.chat(prompt)
-            return self.postprocessing_fn(response.response)
+        
+        response = self.chat_engine.chat(prompt)
+        return self.postprocessing_fn(response.response)
+
+    async def async_process_prompt(self, prompt, user_name):
+        if user_name:
+            self.set_engine(user_name)
+
+        if self.llamaguard_pack: # quick check of user prompt
+            moderator_response_for_input = self.llamaguard_pack.run(prompt)
+            if moderator_response_for_input != "safe":
+                yield "Пожалуй, лучше поговорить на другую тему."
+                return
 
         response = self.chat_engine.stream_chat(prompt)
         # accumulate sentences and yield them back
@@ -226,10 +236,19 @@ class LLMProcessor(UsualLoggedClass):
                 yield self.postprocessing_fn(text)
                 text = ""
 
+async def _async_test_demo():
+    llm = LLMProcessor(os.environ.get("PROMPT_PATH"), os.environ.get("RAG_PATH"))
+    async for sentence in llm.async_process_prompt("Привет", "юзернейм"):
+        print(sentence)
+
+def _test_demo():
+    llm = LLMProcessor(os.environ.get("PROMPT_PATH"), os.environ.get("RAG_PATH"))
+    print(llm.process_prompt("Привет", "юзернейм"))
 
 if __name__ == "__main__":
-    llm = LLMProcessor(os.environ.get("PROMPT_PATH"), os.environ.get("RAG_PATH"))
-    for sentence in llm.process_prompt("Привет", "юзернейм", stream=True):
-        print(sentence)
+    _test_demo()
+    
+    import asyncio
+    asyncio.run(_async_test_demo())
     
   

@@ -1,26 +1,59 @@
-import threading
-from queue import Queue
-from connection.pipethread import PipelineThread
 import time, os
 import dotenv
+import asyncio
 
-class FolderMonitor(threading.Thread):
+from pipeline import Pipeline
+
+
+class OneThreadProcessor:
     """ Thread monitors input folder and puts new_filenames into the queue"""
-    def __init__(self, output: Queue, input_folder=".received", check_freq=1.0):
-        threading.Thread.__init__(self)
+    def __init__(self, input_folder=".received", check_freq=1.0, **pipeline_args):
         self.input = input_folder
-        self.output = output
         self.check_freq = check_freq
         os.makedirs(self.input, 0o777, True)
+
+        self.processor = Pipeline(**pipeline_args)
+        # variable to store current username, expect user answer as result
+        self.username = None
     
-    def run(self):
+    async def run(self):
         while True:
             files = [os.path.join(self.input, file_name) for file_name in os.listdir(self.input)]
             # fetch files using creation date
             sorted_files = sorted(files, key=lambda x: os.path.getctime(x))
-            for file in sorted_files:
-                self.output.put(file)
-            time.sleep(self.check_freq)
+            t = time.time_ns()
+            for input_file_name in sorted_files:
+                # process in place
+                _name = os.path.split(input_file_name)[-1]
+                # use same names in output as in input
+                target_name = os.path.join(self.processor.tts.folder, os.path.splitext(_name)[0] + ".wav")
+                if _name == "newuser":
+                    # initiate new protocol, ask user his name
+                    self.username = None
+                    output_file_name = self.processor.tts.get_audio("Здравствуйте, меня зовут Сергей Капица! Представьтесь, пожалуйста.", output_name=target_name)
+                else:
+                    if self.username is None: # expect user name as an answer
+                        user_answer = self.processor.asr.get_text(input_file_name)
+                        if user_answer is None:
+                            print(f"Couldn't fetch username: {user_answer} from file {input_file_name}. Setting name to Дорогой друг")
+                            self.username = "Дорогой друг"
+                        else:
+                            user_answer = user_answer.strip(".,! ").capitalize()
+                            print(f"User answered: {user_answer}")
+                            self.username = user_answer
+                        # self.processor.llm.set_engine(user_name=None, reset=True, custom_system_prompt="""Ты - система аутентификации для ASR. Пользователя просили представиться. Выведи в ответ только его имя.""")
+                        # self.username = self.processor.llm.process_prompt(user_answer, user_name="user")
+                        # print(f"System concluded: {user_answer}")
+                        self.processor.set_user(self.username)
+                        output_file_name = self.processor.tts.get_audio(f"{self.username}, приятно познакомиться", output_name=target_name)
+                    else:
+                        async for output_file_name in self.processor.async_process(user_name=self.username, file_to_process=input_file_name, output_name=target_name):
+                            print(output_file_name)
+                os.remove(input_file_name)
+
+            t = time.time_ns() - t
+            if t < self.check_freq:
+                time.sleep(self.check_freq - t)
 
 if __name__ == "__main__":
     dotenv.load_dotenv()
@@ -37,11 +70,6 @@ if __name__ == "__main__":
         os.remove(os.path.join(output_folder, f))
     for f in os.listdir(input_folder):
         os.remove(os.path.join(input_folder, f))
-    
-    filenames_queue = Queue()
-    from utils.logger import logger
-    logger.log_mode = "s"
-    PipelineThread(filenames_queue, None, timeout=None,
-    pipeline_args={"output_folder" : output_folder, "model_url": model_url, "use_llama_guard": use_llama_guard}).start()
-    FolderMonitor(filenames_queue, input_folder=input_folder, check_freq=1.0).start()
-    filenames_queue.join()
+
+    runnable = OneThreadProcessor(input_folder=input_folder, check_freq=1.0, output_folder=output_folder, model_url=model_url, use_llama_guard=use_llama_guard)
+    asyncio.run(runnable.run())

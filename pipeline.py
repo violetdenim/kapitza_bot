@@ -5,15 +5,12 @@ import torchaudio, torch
 import time
 os.system("pip install -U accelerate")
 from src.llm import LLMProcessor
-from src.tts import TTSProcessor
+from src.tts import TTSProcessor, TTSThread
 from src.asr import ASRProcessor
-
 from utils.logger import UsualLoggedClass 
-
-
+from queue import Queue
 # load global variables from local .env file
 dotenv.load_dotenv()
-
 
 class Pipeline(UsualLoggedClass):
     def __init__(self,
@@ -31,6 +28,7 @@ class Pipeline(UsualLoggedClass):
         else:
             self.asr = None
             self.tts = None
+
         self.llm = LLMProcessor(os.environ.get("PROMPT_PATH"), os.environ.get("RAG_PATH"),
                 model_url=model_url, use_llama_guard=use_llama_guard, prepare_for_audio=prepare_for_audio)
 
@@ -40,7 +38,7 @@ class Pipeline(UsualLoggedClass):
     def save_context(self, user_name):
         self.llm.save_context(user_name)
 
-    def process(self, user_name, file_to_process=None, user_message=None, output_mode='audio', output_name=None, stream=False):
+    def process(self, user_name, file_to_process=None, user_message=None, output_mode='audio', output_name=None):
         assert ((file_to_process is None) ^ (user_message is None))
         assert((output_mode == "text") or (self.tts))
         self.llm.set_engine(user_name, reset=True)
@@ -49,18 +47,37 @@ class Pipeline(UsualLoggedClass):
         if user_message is None: # invalid input path, just skip
             return None
         if len(user_message) == 0:
-            return None, "Прошу прощения, не расслышал."
-        if not stream:
-            sentence = self.llm.process_prompt(user_message, user_name, stream=False)
+            return "Прошу прощения, не расслышал."
+            
+        sentence = self.llm.process_prompt(user_message, user_name)
+        if output_mode == "text":
+            return sentence
+        return self.tts.get_audio(sentence, format=".wav" if output_mode == "audio" else ".ogg", output_name=output_name)
+    
+    async def async_process(self, user_name, file_to_process=None, user_message=None, output_mode='audio', output_name=None):
+        assert ((file_to_process is None) ^ (user_message is None))
+        assert((output_mode == "text") or (self.tts))
+        self.llm.set_engine(user_name, reset=True)
+        if user_message is None and self.asr:
+            user_message = self.asr.get_text(file_to_process)
+        if user_message is None: # invalid input path, just skip
+            yield None
+            return
+        if len(user_message) == 0:
+            yield "Прошу прощения, не расслышал."
+            return
+        index = 0
+        async for sentence in self.llm.async_process_prompt(user_message, user_name):
             if output_mode == "text":
-                return sentence
-            return self.tts.get_audio(sentence, format=".wav" if output_mode == "audio" else ".ogg", output_name=output_name)
-        else:
-            for sentence in self.llm.process_prompt(user_message, user_name, stream=True):
-                if output_mode == "text":
-                    yield sentence
-                else:
-                    yield self.tts.get_audio(sentence, format=".wav" if output_mode == "audio" else ".ogg", output_name=output_name)
+                yield sentence
+            else:
+                iteration_name = None
+                if output_name:
+                    name, ext = os.path.splitext(output_name)
+                    iteration_name = name + "_" + str(index) + ext
+                yield self.tts.get_audio(sentence, format=".wav" if output_mode == "audio" else ".ogg", output_name=iteration_name)
+            index += 1
+
 
 def concat_wavs(inputs, output):
     x = []
@@ -103,7 +120,7 @@ def create_audio(output):
     tts.get_audio("""генеративную маску""", format=".wav", output_name=output)
     
 
-def get_questions(input_name):
+def _get_questions(input_name):
     if input_name is None:
         return ["Здравствуйте, Сергей Петрович!",
         "Continue the fibonnaci sequence: 1, 1, 2, 3, 5, 8,",
@@ -133,44 +150,46 @@ def get_questions(input_name):
         return questions
 
 
-def pipe_on_questions(pipe, questions, output_name=None):
+def _pipe_on_questions(pipe, questions, output_name=None):
     if output_name and os.path.exists(output_name):
         os.remove(output_name)
     for msg in questions:
-        # if output_name is None:
-        #     _x = sys.stdout, sys.stderr
-        #     sys.stdout, sys.stderr = open(os.devnull, 'w'), open(os.devnull, 'w')
-        result = pipe.process(user_name="Василий", user_message=msg,  output_mode="text")
-            # sys.stdout, sys.stderr = _x
+        # non stream generator returns single value
+        result = pipe.process(user_name="Василий", user_message=msg, output_mode="text")
         print(f"Василий: {msg}")
         print(f"Сергей Петрович: {result}")
-        
         if output_name is not None:
             with open(output_name, 'a+') as out_file:
                 out_file.write(f"Василий: {msg}\n")
                 out_file.write(f"Сергей Петрович: {result}\n")
 
-def interactive_dialogue(pipe):
+async def _interactive_dialogue(pipe, output_mode="text"):
     print('\n' * 100)
     name = input("Здравствуйте! Меня зовут Сергей Петрович Капица. А Вас? >")
     name = name.strip(' ')
     print(f"Очень приятно, {name}. Давайте продолжим разговор!")
+    question_index = 0
     while True:
         try:
             msg = input(f'{name}: ')
         except Exception as e:
+            print(f"Got exception {e}")
             break
-        print('Сергей Петрович: ', end="", flush=True)
-        for sentence in pipe.process(user_name=name, user_message=msg, output_mode="text", stream=True):
-            print(sentence + " ", end="", flush=True)
-        print()
+        if output_mode == "text":
+            print('Сергей Петрович: ', end="", flush=True)
+            async for sentence in pipe.async_process(user_name=name, user_message=msg, output_mode="text"):
+                print(sentence + " ", end="", flush=True)
+            print()
+        else:
+            async for file_name in pipe.async_process(user_name=name, user_message=msg, output_mode=output_mode, output_name=f".generated/{question_index}" + ".wav"):
+                print(file_name)
+        question_index += 1
         # print(f'Сергей Петрович: {ans}')
 
-if __name__ == '__main__':
+async def _interactive_demo(use_questions=False, output_mode="text"):
     # use this interface to enable\disable logging on application level
     from utils.logger import logger
     logger.log_mode = None
-
     # names = [f for f in os.listdir('.') if os.path.splitext(f)[-1] == ".wav"]
     # names = sorted(names)
     # print(names)
@@ -187,9 +206,14 @@ if __name__ == '__main__':
     # model_url=f"https://huggingface.co/kzipa/kap34_8_8_10/resolve/main/kap34_8_8_10.{quant}.gguf?download=true"
 
     # model_url = "unsloth/Llama-3.2-11B-Vision-Instruct"
-    # enable logging
-    pipe = Pipeline(model_url=model_url, use_llama_guard=False, prepare_for_audio=False)
-    # quest = get_questions("questions.txt")
-    # pipe_on_questions(pipe, quest, output_name="llama3_answers.txt")
-    interactive_dialogue(pipe)
+    pipe = Pipeline(model_url=model_url, use_llama_guard=False, prepare_for_audio=(output_mode != "text") )
+    if use_questions:
+        quest = _get_questions("questions.txt")
+        _pipe_on_questions(pipe, quest, output_name="llama3_answers.txt")
+    else:
+        await _interactive_dialogue(pipe, output_mode=output_mode)
+
+if __name__ == '__main__':
+    import asyncio
+    asyncio.run(_interactive_demo(use_questions=False, output_mode="audio"))
     
