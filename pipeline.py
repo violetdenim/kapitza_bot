@@ -59,6 +59,14 @@ class Pipeline(UsualLoggedClass):
     async def async_process(self, user_name, file_to_process=None, user_message=None, output_mode='audio', output_name=None):
         assert ((file_to_process is None) ^ (user_message is None))
         assert((output_mode == "text") or (self.tts))
+        
+        def construct_name(output_name, index):
+            iteration_name = None
+            if output_name:
+                name, ext = os.path.splitext(output_name)
+                iteration_name = name + "_" + str(index) + ext
+            return iteration_name
+
         self.llm.set_engine(user_name, reset=True)
         if user_message is None and self.asr:
             user_message = self.asr.get_text(file_to_process)
@@ -69,20 +77,27 @@ class Pipeline(UsualLoggedClass):
             yield "Прошу прощения, не расслышал."
             return
         index = 0
+        audio_block = ""
         async for sentence in self.llm.async_process_prompt(user_message, user_name):
             if output_mode == "text":
                 yield sentence
             else:
                 # put to TTS Queue
-                iteration_name = None
-                if output_name:
-                    name, ext = os.path.splitext(output_name)
-                    iteration_name = name + "_" + str(index) + ext
                 if len(sentence) < 5: # at least two letters
                     print(f"Attention! Short sentence `{sentence}` is passed to TTS")
-                self.queue.put([sentence, ".wav" if output_mode == "audio" else ".ogg", iteration_name])
-                yield None # do nothing, second process will do generation and put it to folder
-            index += 1
+                
+                if len(audio_block) + len(sentence) < 128: # accumulate short sentences to improve audio generation
+                    audio_block += " " + sentence
+                else:
+                    if len(audio_block):
+                        print(f"Generating audio for text `{audio_block}`")
+                        self.queue.put([audio_block, ".wav" if output_mode == "audio" else ".ogg", construct_name(output_name, index)])
+                        yield None # do nothing, second process will do generation and put it to folder
+                        index += 1
+                    audio_block = sentence
+        if len(audio_block):
+            print(f"Generating audio for text `{audio_block}`")
+            self.queue.put([audio_block, ".wav" if output_mode == "audio" else ".ogg", construct_name(output_name, index)])
 
     def __exit__(self):
         self.queue.put(9) # killing signal
@@ -210,14 +225,14 @@ async def _interactive_demo(use_questions=False, output_mode="text"):
     os.environ["HUGGINGFACE_ACCESS_TOKEN"] = os.environ["HF_AUTH"]
     # os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
     # model_url = "https://huggingface.co/QuantFactory/Meta-Llama-3.1-8B-GGUF/resolve/main/Meta-Llama-3.1-8B.Q4_K_M.gguf?download=true"
-
-    model_url = "https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf?download=true"
+    # model_url = "https://huggingface.co/QuantFactory/suzume-llama-3-8B-multilingual-GGUF/resolve/main/suzume-llama-3-8B-multilingual.Q4_K_M.gguf?download=true"
+    # model_url = "https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf?download=true"
     # model_url = "https://huggingface.co/ruslandev/llama-3-8b-gpt-4o-ru1.0-gguf/resolve/main/ggml-model-Q4_K_M.gguf?download=true"
     # model_url = "https://huggingface.co/QuantFactory/suzume-llama-3-8B-multilingual-GGUF/resolve/main/suzume-llama-3-8B-multilingual.Q4_K_M.gguf?download=true"
     # model_url = 'https://huggingface.co/QuantFactory/Meta-Llama-3-70B-Instruct-GGUF-v2/resolve/main/Meta-Llama-3-70B-Instruct-v2.Q4_K_M.gguf?download=true'
     # model_url = "https://huggingface.co/QuantFactory/Qwen2.5-14B-Instruct-GGUF/resolve/main/Qwen2.5-14B-Instruct.Q4_K_M.gguf?download=true"
-    # quant = "Q4_K_M" # "BF16"#
-    # model_url=f"https://huggingface.co/kzipa/kap34_8_8_10/resolve/main/kap34_8_8_10.{quant}.gguf?download=true"
+    quant = "Q4_K_M" # "BF16"#
+    model_url=f"https://huggingface.co/kzipa/kap34_8_8_10/resolve/main/kap34_8_8_10.{quant}.gguf?download=true"
 
     # model_url = "unsloth/Llama-3.2-11B-Vision-Instruct"
     

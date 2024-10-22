@@ -159,9 +159,9 @@ class LLMProcessor(UsualLoggedClass):
         if prepare_for_audio:
             self.normalizer = RUNorm()
             self.normalizer.load(model_size="big", device="cpu")
-            self.postprocessing_fn = lambda x: self.normalizer.norm(drop_ending(strip_substr(x, ['assistant', ' ', '\n'])))
+            self.postprocessing_fn = lambda x: self.normalizer.norm(drop_ending(strip_substr(x, ['assistant', ' ', '\n']).replace("Вы welcome", "Пожалуйста")))
         else:
-            self.postprocessing_fn = lambda x: drop_ending(strip_substr(x, ['assistant', ' ', '\n']))
+            self.postprocessing_fn = lambda x: drop_ending(strip_substr(x, ['assistant', ' ', '\n']).replace("Вы welcome", "Пожалуйста"))
         if use_llama_guard:
             from llama_index.core.llama_pack import download_llama_pack
             LlamaGuardModeratorPack = download_llama_pack("LlamaGuardModeratorPack")#, "../llamaguard_pack")
@@ -169,11 +169,12 @@ class LLMProcessor(UsualLoggedClass):
         else:
             self.llamaguard_pack = None
 
-    def get_system_prompt(self, user_name):
+    def get_system_prompt(self, user_name, user_gender="F"):
         if self.prompt is None:
             with open(self.prompt_path, "r", encoding='utf-8') as f:
                 self.prompt = '\n'.join(f.readlines())
         self.prompt = self.prompt.replace("{user_name}", user_name)
+        self.prompt = self.prompt.replace("{user_gender}", "женщина" if user_gender == "F" else "мужчина")
         date = datetime.datetime.now().date()
         return f"Сегодня {date.day}.{date.month}.{date.year}" + self.prompt
     
@@ -182,7 +183,7 @@ class LLMProcessor(UsualLoggedClass):
             assert(self.current_user == user_name)
             self.chat_store.persist(persist_path=self.current_user + ".json")
 
-    def set_engine(self, user_name, reset=False, custom_system_prompt=None):
+    def set_engine(self, user_name, user_gender="F", reset=False, custom_system_prompt=None):
         if user_name is None:
             assert(custom_system_prompt is not None)
         if user_name and reset and os.path.exists(user_name + ".json"):
@@ -199,15 +200,15 @@ class LLMProcessor(UsualLoggedClass):
                     user_name = "user" # for technical usage of pipeline
         else:
             return
-        chat_memory = ChatMemoryBuffer.from_defaults(token_limit=4096, chat_store=self.chat_store, chat_store_key=user_name)
+        chat_memory = ChatMemoryBuffer.from_defaults(token_limit=8192, chat_store=self.chat_store, chat_store_key=user_name)
         self.chat_engine = self.index.as_chat_engine(chat_mode="condense_plus_context",
                                                      memory=chat_memory, 
-                                                     system_prompt=self.get_system_prompt(user_name) if not custom_system_prompt else custom_system_prompt)
+                                                     system_prompt=self.get_system_prompt(user_name, user_gender=user_gender) if not custom_system_prompt else custom_system_prompt)
         self.current_user = user_name
 
-    def process_prompt(self, prompt, user_name, stream=False):
+    def process_prompt(self, prompt, user_name, user_gender="F"):
         if user_name:
-            self.set_engine(user_name)
+            self.set_engine(user_name, user_gender=user_gender)
 
         if self.llamaguard_pack: # quick check of user prompt
             moderator_response_for_input = self.llamaguard_pack.run(prompt)
@@ -217,9 +218,9 @@ class LLMProcessor(UsualLoggedClass):
         response = self.chat_engine.chat(prompt)
         return self.postprocessing_fn(response.response)
 
-    async def async_process_prompt(self, prompt, user_name):
+    async def async_process_prompt(self, prompt, user_name, user_gender="F"):
         if user_name:
-            self.set_engine(user_name)
+            self.set_engine(user_name, user_gender=user_gender)
 
         if self.llamaguard_pack: # quick check of user prompt
             moderator_response_for_input = self.llamaguard_pack.run(prompt)

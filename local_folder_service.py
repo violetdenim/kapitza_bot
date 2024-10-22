@@ -57,13 +57,13 @@ class OneThreadProcessor:
                                     Ввод: Иван Мухин. Только так и никак иначе. Вывод: Иван Мухин.
                                     Ввод: Мухин Иван. Я люблю свою фамилию. Вывод: Иван Мухин.
                                     """
-                                # self.processor.llm.set_engine(user_name=None, reset=True, custom_system_prompt=custom_prompt)
-                                # user_answer = self.processor.llm.chat_engine.chat(user_answer).response
+                                self.processor.llm.set_engine(user_name=None, reset=True, custom_system_prompt=custom_prompt)
+                                user_answer = self.processor.llm.chat_engine.chat(user_answer).response
                                 user_answer = user_answer.strip(".,! ").capitalize()
                                 print(f"User answered: {user_answer}")
                                 self.username = user_answer
                             self.processor.set_user(self.username)
-                            output_file_name = audio_engine.get_audio(f"{self.username}, приятно познакомиться", output_name=target_name)
+                            audio_engine.get_audio(f"{self.username}, приятно познакомиться", output_name=target_name)
                         else:
                             async for _ in self.processor.async_process(user_name=self.username, file_to_process=input_file_name, output_name=target_name):
                                 pass
