@@ -23,15 +23,16 @@ class OneThreadProcessor:
             sorted_files = sorted(files, key=lambda x: os.path.getctime(x))
             if len(sorted_files):
                 t = time.time_ns()
+                audio_engine = self.processor.tts.engine
                 for input_file_name in sorted_files:
                     # process in place
                     _name = os.path.split(input_file_name)[-1]
                     # use same names in output as in input
-                    target_name = os.path.join(self.processor.tts.folder, os.path.splitext(_name)[0] + ".wav")
+                    target_name = os.path.join(audio_engine.folder, os.path.splitext(_name)[0] + ".wav")
                     if _name == "newuser":
                         # initiate new protocol, ask user his name
                         self.username = None
-                        output_file_name = self.processor.tts.get_audio("Здравствуйте, меня зовут Сергей Капица! Представьтесь, пожалуйста.", output_name=target_name)
+                        output_file_name = audio_engine.get_audio("Здравствуйте, меня зовут Сергей Капица! Представьтесь, пожалуйста.", output_name=target_name)
                     else:
                         if self.username is None: # expect user name as an answer
                             user_answer = self.processor.asr.get_text(input_file_name)
@@ -39,7 +40,6 @@ class OneThreadProcessor:
                                 print(f"Couldn't fetch username: {user_answer} from file {input_file_name}. Setting name to Дорогой друг")
                                 self.username = "Дорогой друг"
                             else:
-                                # user_answer = user_answer.strip(".,! ").capitalize()
                                 custom_prompt = custom_prompt = """Ты - система аутентификации для ASR. Пользователя просили представиться. Выведи в ответ только его или её имя в именительном (звательном) падеже и отчество, если он указал его.
                                     Фамилию игнорируй, если пользователь специально не обозначил полное обращение. Если ввод нерелевантен, выведи !
 
@@ -57,16 +57,16 @@ class OneThreadProcessor:
                                     Ввод: Иван Мухин. Только так и никак иначе. Вывод: Иван Мухин.
                                     Ввод: Мухин Иван. Я люблю свою фамилию. Вывод: Иван Мухин.
                                     """
-                                self.processor.llm.set_engine(user_name=None, reset=True, custom_system_prompt=custom_prompt)
-                                user_answer = self.processor.llm.chat_engine.chat(user_answer).response
+                                # self.processor.llm.set_engine(user_name=None, reset=True, custom_system_prompt=custom_prompt)
+                                # user_answer = self.processor.llm.chat_engine.chat(user_answer).response
                                 user_answer = user_answer.strip(".,! ").capitalize()
                                 print(f"User answered: {user_answer}")
                                 self.username = user_answer
                             self.processor.set_user(self.username)
-                            output_file_name = self.processor.tts.get_audio(f"{self.username}, приятно познакомиться", output_name=target_name)
+                            output_file_name = audio_engine.get_audio(f"{self.username}, приятно познакомиться", output_name=target_name)
                         else:
-                            async for output_file_name in self.processor.async_process(user_name=self.username, file_to_process=input_file_name, output_name=target_name):
-                                print(output_file_name)
+                            async for _ in self.processor.async_process(user_name=self.username, file_to_process=input_file_name, output_name=target_name):
+                                pass
                     os.remove(input_file_name)
                 t = time.time_ns() - t
                 print(f"Processing {input_file_name} took {t/1_000_000_000} s")
@@ -79,7 +79,7 @@ if __name__ == "__main__":
     input_folder = ".received"
     output_folder = ".generated"
     # model_url = "https://huggingface.co/kzipa/kap34_8_8_10/resolve/main/kap34_8_8_10.Q4_K_M.gguf?download=true"
-    model_url = "https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf"
+    model_url = "https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf?download=true"
     use_llama_guard = False
 
     os.makedirs(input_folder, 0o777, True)
