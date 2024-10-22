@@ -34,8 +34,8 @@ class Pipeline(UsualLoggedClass):
         self.llm = LLMProcessor(os.environ.get("PROMPT_PATH"), os.environ.get("RAG_PATH"),
                 model_url=model_url, use_llama_guard=use_llama_guard, prepare_for_audio=prepare_for_audio)
 
-    def set_user(self, user_name):
-        self.llm.set_engine(user_name)
+    def set_user(self, user_name, user_gender):
+        self.llm.set_engine(user_name, user_gender)
     
     def save_context(self, user_name):
         self.llm.save_context(user_name)

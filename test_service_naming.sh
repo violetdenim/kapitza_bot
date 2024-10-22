@@ -4,5 +4,5 @@ cp files/name1.m4a .received
 sleep 3
 cp files/test.wav .received
 sleep 3
-cp files/color.wav .received
+cp files/color.m4a .received
 sleep 3

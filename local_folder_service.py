@@ -3,6 +3,7 @@ import dotenv
 import asyncio
 
 from pipeline import Pipeline
+from src.gender import detect_gender
 
 
 class OneThreadProcessor:
@@ -15,6 +16,7 @@ class OneThreadProcessor:
         self.processor = Pipeline(**pipeline_args)
         # variable to store current username, expect user answer as result
         self.username = None
+        self.usergender = "F"
     
     async def run(self):
         while True:
@@ -39,6 +41,7 @@ class OneThreadProcessor:
                             if user_answer is None:
                                 print(f"Couldn't fetch username: {user_answer} from file {input_file_name}. Setting name to Дорогой друг")
                                 self.username = "Дорогой друг"
+                                self.usergender = "M"
                             else:
                                 custom_prompt = custom_prompt = """Ты - система аутентификации для ASR. Пользователя просили представиться. Выведи в ответ только его или её имя в именительном (звательном) падеже и отчество, если он указал его.
                                     Фамилию игнорируй, если пользователь специально не обозначил полное обращение. Если ввод нерелевантен, выведи !
@@ -58,11 +61,16 @@ class OneThreadProcessor:
                                     Ввод: Мухин Иван. Я люблю свою фамилию. Вывод: Иван Мухин.
                                     """
                                 self.processor.llm.set_engine(user_name=None, reset=True, custom_system_prompt=custom_prompt)
+                                print(f"User answered: {user_answer}")
                                 user_answer = self.processor.llm.chat_engine.chat(user_answer).response
                                 user_answer = user_answer.strip(".,! ").capitalize()
-                                print(f"User answered: {user_answer}")
+                                
                                 self.username = user_answer
-                            self.processor.set_user(self.username)
+                                self.usergender = detect_gender(input_file_name)
+                                print(f"User name: {self.username}")
+                                print(f"User gender: {self.usergender}")
+
+                            self.processor.set_user(self.username, self.usergender)
                             audio_engine.get_audio(f"{self.username}, приятно познакомиться", output_name=target_name)
                         else:
                             async for _ in self.processor.async_process(user_name=self.username, file_to_process=input_file_name, output_name=target_name):
@@ -79,7 +87,8 @@ if __name__ == "__main__":
     input_folder = ".received"
     output_folder = ".generated"
     # model_url = "https://huggingface.co/kzipa/kap34_8_8_10/resolve/main/kap34_8_8_10.Q4_K_M.gguf?download=true"
-    model_url = "https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf?download=true"
+    # model_url = "https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf?download=true"
+    model_url=f"https://huggingface.co/kzipa/kap34_8_8_10/resolve/main/kap34_8_8_10.Q4_K_M.gguf?download=true"
     use_llama_guard = False
 
     os.makedirs(input_folder, 0o777, True)
