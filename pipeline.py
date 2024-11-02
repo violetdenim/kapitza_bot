@@ -245,6 +245,10 @@ async def _interactive_demo(use_questions=False, output_mode="text"):
 
 if __name__ == '__main__':
     # create_audio("english_test.wav")
-    import asyncio
-    asyncio.run(_interactive_demo(use_questions=False, output_mode="audio"))
+    tts = TTSProcessor(os.environ.get("AUDIO_PATH"), hf_token=os.environ.get('HF_AUTH'))
+    print(tts.get_audio("""Hi, Jane! My name is Sergey Kapitsa. I am inspired by the latest achievements of science, and you?""",\
+         format=".wav", output_name="test.wav"))
+    
+    # import asyncio
+    # asyncio.run(_interactive_demo(use_questions=False, output_mode="text"))
     

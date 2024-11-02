@@ -55,8 +55,10 @@ class TTSProcessor(UsualLoggedClass):
         else:
             tmp_filename = output_name
         # modified bits_per_sample for LipSync
-        torchaudio.save(tmp_filename, torch.tensor(out["wav"]).unsqueeze(
-            0), 24_000, encoding="PCM_S", backend="soundfile", bits_per_sample=16)
+        # modified frame rate for offline lipsync
+        wave = torch.tensor(out["wav"]).unsqueeze(0)
+        wave = torchaudio.functional.resample(wave, 24_000, 16_000)
+        torchaudio.save(tmp_filename, wave, 16_000, encoding="PCM_S", backend="soundfile", bits_per_sample=16)
         return tmp_filename
 
 
