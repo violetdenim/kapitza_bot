@@ -57,7 +57,7 @@ class Pipeline(UsualLoggedClass):
         return self.tts.get_audio(sentence, format=".wav" if output_mode == "audio" else ".ogg", output_name=output_name)
     
     async def async_process(self, user_name, file_to_process=None, user_message=None, output_mode='audio', output_name=None):
-        assert ((file_to_process is None) ^ (user_message is None))
+        assert((file_to_process is None) ^ (user_message is None))
         assert((output_mode == "text") or (self.tts))
         
         def construct_name(output_name, index):

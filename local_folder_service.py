@@ -36,8 +36,14 @@ class OneThreadProcessor:
                         self.username = None
                         output_file_name = audio_engine.get_audio("Здравствуйте, меня зовут Сергей Капица! Представьтесь, пожалуйста.", output_name=target_name)
                     else:
+                        _, _ext = os.path.splitext(_name)
                         if self.username is None: # expect user name as an answer
-                            user_answer = self.processor.asr.get_text(input_file_name)
+                            if _ext == ".txt":
+                                with open(input_file_name, 'r') as f:
+                                    user_answer = f.read()
+                            else:
+                                user_answer = self.processor.asr.get_text(input_file_name)
+                                
                             if user_answer is None:
                                 print(f"Couldn't fetch username: {user_answer} from file {input_file_name}. Setting name to Дорогой друг")
                                 self.username = "Дорогой друг"
@@ -73,7 +79,15 @@ class OneThreadProcessor:
                             self.processor.set_user(self.username, self.usergender)
                             audio_engine.get_audio(f"{self.username}, приятно познакомиться", output_name=target_name)
                         else:
-                            async for _ in self.processor.async_process(user_name=self.username, file_to_process=input_file_name, output_name=target_name):
+                            if _ext == '.txt':
+                                # override user_messaage with file content
+                                with open(input_file_name, 'r') as f:
+                                    user_message = f.read()
+                                file_name = None
+                            else:
+                                user_message = None
+                                file_name = input_file_name
+                            async for _ in self.processor.async_process(user_name=self.username, file_to_process=file_name, user_message=user_message, output_name=target_name):
                                 pass
                     os.remove(input_file_name)
                 t = time.time_ns() - t
