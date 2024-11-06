@@ -39,7 +39,7 @@ class OneThreadProcessor:
                         _, _ext = os.path.splitext(_name)
                         if self.username is None: # expect user name as an answer
                             if _ext == ".txt":
-                                with open(input_file_name, 'r') as f:
+                                with open(input_file_name, 'r', encoding='utf-8') as f:
                                     user_answer = f.read()
                             else:
                                 user_answer = self.processor.asr.get_text(input_file_name)
@@ -81,7 +81,7 @@ class OneThreadProcessor:
                         else:
                             if _ext == '.txt':
                                 # override user_messaage with file content
-                                with open(input_file_name, 'r') as f:
+                                with open(input_file_name, 'r', encoding='utf-8') as f:
                                     user_message = f.read()
                                 file_name = None
                             else:
@@ -101,7 +101,7 @@ if __name__ == "__main__":
     input_folder = ".received"
     output_folder = ".generated"
     # model_url = "https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf"
-    model_url=f"https://huggingface.co/kzipa/kap34_8_8_10/resolve/main/kap34_8_8_10.Q4_K_M.gguf"
+    model_url = f"https://huggingface.co/kzipa/kap34_8_8_10/resolve/main/kap34_8_8_10.Q4_K_M.gguf"
     use_llama_guard = False
 
     os.makedirs(input_folder, 0o777, True)
