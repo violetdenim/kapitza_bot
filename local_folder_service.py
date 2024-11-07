@@ -72,7 +72,10 @@ class OneThreadProcessor:
                                 user_answer = user_answer.strip(".,! ").capitalize()
                                 
                                 self.username = user_answer
-                                self.usergender = detect_gender(input_file_name)
+                                if _ext != ".txt":
+                                    self.usergender = detect_gender(input_file_name)
+                                else:
+                                    self.usergender = 'F'
                                 print(f"User name: {self.username}")
                                 print(f"User gender: {self.usergender}")
 
