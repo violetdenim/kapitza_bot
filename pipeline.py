@@ -40,10 +40,9 @@ class Pipeline(UsualLoggedClass):
     def save_context(self, user_name):
         self.llm.save_context(user_name)
 
-    def process(self, user_name, file_to_process=None, user_message=None, output_mode='audio', output_name=None):
+    def process(self, file_to_process=None, user_message=None, output_mode='audio', output_name=None):
         assert ((file_to_process is None) ^ (user_message is None))
         assert((output_mode == "text") or (self.tts))
-        self.llm.set_engine(user_name, reset=True)
         if user_message is None and self.asr:
             user_message = self.asr.get_text(file_to_process)
         if user_message is None: # invalid input path, just skip
@@ -51,12 +50,12 @@ class Pipeline(UsualLoggedClass):
         if len(user_message) == 0:
             return "Прошу прощения, не расслышал."
             
-        sentence = self.llm.process_prompt(user_message, user_name)
+        sentence = self.llm.process_prompt(user_message)
         if output_mode == "text":
             return sentence
         return self.tts.get_audio(sentence, format=".wav" if output_mode == "audio" else ".ogg", output_name=output_name)
     
-    async def async_process(self, user_name, file_to_process=None, user_message=None, output_mode='audio', output_name=None):
+    async def async_process(self, file_to_process=None, user_message=None, output_mode='audio', output_name=None):
         assert((file_to_process is None) ^ (user_message is None))
         assert((output_mode == "text") or (self.tts))
         
@@ -67,7 +66,6 @@ class Pipeline(UsualLoggedClass):
                 iteration_name = name + "_" + str(index) + ext
             return iteration_name
 
-        self.llm.set_engine(user_name, reset=True)
         if user_message is None and self.asr:
             user_message = self.asr.get_text(file_to_process)
         if user_message is None: # invalid input path, just skip
@@ -78,7 +76,7 @@ class Pipeline(UsualLoggedClass):
             return
         index = 0
         audio_block = ""
-        async for sentence in self.llm.async_process_prompt(user_message, user_name):
+        async for sentence in self.llm.async_process_prompt(user_message):
             if output_mode == "text":
                 yield sentence
             else:
@@ -189,11 +187,12 @@ def _pipe_on_questions(pipe, questions, output_name=None):
                 out_file.write(f"Василий: {msg}\n")
                 out_file.write(f"Сергей Петрович: {result}\n")
 
-async def _interactive_dialogue(pipe, output_mode="text"):
+async def _interactive_dialogue(pipe: Pipeline, output_mode="text"):
     print('\n' * 100)
     name = input("Здравствуйте! Меня зовут Сергей Петрович Капица. А Вас? >")
     name = name.strip(' ')
     print(f"Очень приятно, {name}. Давайте продолжим разговор!")
+    pipe.set_user(name, "F")
     question_index = 0
     while True:
         try:
@@ -203,11 +202,11 @@ async def _interactive_dialogue(pipe, output_mode="text"):
             break
         if output_mode == "text":
             print('Сергей Петрович: ', end="", flush=True)
-            async for sentence in pipe.async_process(user_name=name, user_message=msg, output_mode="text"):
+            async for sentence in pipe.async_process(user_message=msg, output_mode="text"):
                 print(sentence + " ", end="", flush=True)
             print()
         else:
-            async for file_name in pipe.async_process(user_name=name, user_message=msg, output_mode=output_mode, output_name=f".generated/{question_index}" + ".wav"):
+            async for file_name in pipe.async_process(user_message=msg, output_mode=output_mode, output_name=f".generated/{question_index}" + ".wav"):
                 print(file_name)
         question_index += 1
         # print(f'Сергей Петрович: {ans}')

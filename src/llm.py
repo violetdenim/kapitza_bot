@@ -120,7 +120,7 @@ class LLMProcessor(UsualLoggedClass):
                 # You can pass in the URL to a GGML model to download it automatically
                 model_url=model_url,
                 # optionally, you can set the path to a pre-downloaded model instead of model_url
-                model_path=model_path, #"kap_model/unsloth.Q4_K_M.gguf",
+                model_path=model_path,
                 temperature=0.05,
                 max_new_tokens=256,
                 context_window=4096,
@@ -178,12 +178,12 @@ class LLMProcessor(UsualLoggedClass):
         date = datetime.datetime.now().date()
         return f"Сегодня {date.day}.{date.month}.{date.year}" + self.prompt
     
-    def save_context(self, user_name):
-        if user_name:
-            assert(self.current_user == user_name)
-            self.chat_store.persist(persist_path=self.current_user + ".json")
+    def save_context(self):
+        persist_path = self.current_user + ".json"
+        self.chat_store.persist(persist_path=persist_path)
+        return persist_path 
 
-    def set_engine(self, user_name, user_gender="F", reset=False, custom_system_prompt=None):
+    def set_engine(self, user_name, user_gender, reset=False, custom_system_prompt=None):
         if user_name is None:
             assert(custom_system_prompt is not None)
         if user_name and reset and os.path.exists(user_name + ".json"):
@@ -206,10 +206,7 @@ class LLMProcessor(UsualLoggedClass):
                                                      system_prompt=self.get_system_prompt(user_name, user_gender=user_gender) if not custom_system_prompt else custom_system_prompt)
         self.current_user = user_name
 
-    def process_prompt(self, prompt, user_name, user_gender="F"):
-        if user_name:
-            self.set_engine(user_name, user_gender=user_gender)
-
+    def process_prompt(self, prompt):
         if self.llamaguard_pack: # quick check of user prompt
             moderator_response_for_input = self.llamaguard_pack.run(prompt)
             if moderator_response_for_input != "safe":
@@ -218,10 +215,7 @@ class LLMProcessor(UsualLoggedClass):
         response = self.chat_engine.chat(prompt)
         return self.postprocessing_fn(response.response)
 
-    async def async_process_prompt(self, prompt, user_name, user_gender="F"):
-        if user_name:
-            self.set_engine(user_name, user_gender=user_gender)
-
+    async def async_process_prompt(self, prompt):
         if self.llamaguard_pack: # quick check of user prompt
             moderator_response_for_input = self.llamaguard_pack.run(prompt)
             if moderator_response_for_input != "safe":
@@ -234,7 +228,10 @@ class LLMProcessor(UsualLoggedClass):
         for token in response.response_gen:
             text += token
             if token in ".?!":
-                yield self.postprocessing_fn(text)
+                # quick fix: Drop sentence, if English is present
+                english_letters = ''.join(chr(c) for c in range(ord('a'), ord('z')+1)) + ''.join(chr(c) for c in range(ord('A'), ord('Z')+1))
+                if len(set(text).intersection(english_letters)) == 0:
+                    yield self.postprocessing_fn(text)
                 text = ""
                 
         if len(text):
