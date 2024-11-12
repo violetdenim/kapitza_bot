@@ -201,12 +201,14 @@ class LLMProcessor(UsualLoggedClass):
         else:
             return
         chat_memory = ChatMemoryBuffer.from_defaults(token_limit=8192, chat_store=self.chat_store, chat_store_key=user_name)
+        print(f"Setting engine for user={user_name}")
         self.chat_engine = self.index.as_chat_engine(chat_mode="condense_plus_context",
                                                      memory=chat_memory, 
                                                      system_prompt=self.get_system_prompt(user_name, user_gender=user_gender) if not custom_system_prompt else custom_system_prompt)
         self.current_user = user_name
 
     def process_prompt(self, prompt):
+        print(f"Current user={self.current_user}")
         if self.llamaguard_pack: # quick check of user prompt
             moderator_response_for_input = self.llamaguard_pack.run(prompt)
             if moderator_response_for_input != "safe":
@@ -216,6 +218,7 @@ class LLMProcessor(UsualLoggedClass):
         return self.postprocessing_fn(response.response)
 
     async def async_process_prompt(self, prompt):
+        print(f"Current user={self.current_user}")
         if self.llamaguard_pack: # quick check of user prompt
             moderator_response_for_input = self.llamaguard_pack.run(prompt)
             if moderator_response_for_input != "safe":
