@@ -109,8 +109,8 @@ class OneThreadProcessor:
                             if self.object_state == 1: # expect user name as an answer
                                 await self.process_username(input_file_name, target_name)
                             else:
-                                n_repeat = 3
-                                timeout = 3
+                                n_repeat = 1
+                                timeout = 0
                                 while n_repeat > 0:
                                     try:
                                         await self.process_request(input_file_name, target_name)                         
@@ -119,7 +119,7 @@ class OneThreadProcessor:
                                         print(f"Got exception {e}")
                                         n_repeat -= 1
                                         if n_repeat <= 0:
-                                            raise Exception("Unsuccessfully tried to process request for 3 times")
+                                            raise Exception("Unsuccessfully tried to process request")
                                         else:
                                             time.sleep(timeout)
                         if os.path.exists(input_file_name):
