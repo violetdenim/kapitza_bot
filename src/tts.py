@@ -58,6 +58,7 @@ class TTSProcessor(UsualLoggedClass):
         # modified frame rate for offline lipsync
         wave = torch.tensor(out["wav"]).unsqueeze(0)
         wave = torchaudio.functional.resample(wave, 24_000, 16_000)
+        print(f"Saving {tmp_filename}")
         torchaudio.save(tmp_filename, wave, 16_000, encoding="PCM_S", backend="soundfile", bits_per_sample=16)
         return tmp_filename
 
@@ -65,7 +66,6 @@ class TTSProcessor(UsualLoggedClass):
 # retrieves sentences from one queue and pushes audio into another
 class TTSThread(threading.Thread):
     """ Thread accepts audio files using socket and puts their names into queue"""
-
     def __init__(self, input: Queue, output: Queue, **params):
         threading.Thread.__init__(self)
         self.input = input
@@ -82,7 +82,15 @@ class TTSThread(threading.Thread):
             assert(isinstance(package, tuple) or isinstance(package, list))
             assert(len(package) == 3)    
             text, format, output_name = package
-            result = self.engine.get_audio(text=text, format=format, output_name=output_name)
+            if format != "":
+                result = self.engine.get_audio(text=text, format=format, output_name=output_name)
+            else:
+                end_marker = os.path.join(self.engine.folder, output_name)
+                # write 'done' marker
+                print(f"Saving {end_marker}")
+                with open(end_marker, 'w') as m:
+                    m.write('')
+                result = output_name
             if self.output:
                 self.output.put(result)
             self.input.task_done()

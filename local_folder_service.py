@@ -113,10 +113,7 @@ class OneThreadProcessor:
                                 timeout = 3
                                 while n_repeat > 0:
                                     try:
-                                        await self.process_request(input_file_name, target_name)      
-                                        end_marker = os.path.join(self.processor.tts.engine.folder, 'done')
-                                        with open(end_marker, 'w') as m:
-                                            m.write('')                     
+                                        await self.process_request(input_file_name, target_name)                         
                                         n_repeat = 0 # done
                                     except Exception as e:
                                         print(f"Got exception {e}")

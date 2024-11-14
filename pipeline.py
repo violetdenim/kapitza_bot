@@ -77,11 +77,14 @@ class Pipeline(UsualLoggedClass):
         index = 0
         audio_block = ""
         async for sentence in self.llm.async_process_prompt(user_message):
+            meaningful = sum(1 for c in sentence if ord('a') <= ord(c) <= ord('z') or ord('A') <= ord(c) <= ord('Z') or ord('а') <= ord(c) <= ord('я') or ord('А') <= ord(c) <= ord('Я'))
+            if meaningful == 0:
+                continue # skip current iteration
             if output_mode == "text":
                 yield sentence
             else:
                 # put to TTS Queue
-                if len(sentence) < 5: # at least two letters
+                if meaningful < 5: # at least two letters
                     print(f"Attention! Short sentence `{sentence}` is passed to TTS")
                 
                 if len(audio_block) + len(sentence) < 128: # accumulate short sentences to improve audio generation
@@ -96,6 +99,7 @@ class Pipeline(UsualLoggedClass):
         if len(audio_block):
             print(f"Generating audio for text `{audio_block}`")
             self.queue.put([audio_block, ".wav" if output_mode == "audio" else ".ogg", construct_name(output_name, index)])
+        self.queue.put(["", "", "done"])
 
     def __exit__(self):
         self.queue.put(9) # killing signal
