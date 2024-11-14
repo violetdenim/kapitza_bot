@@ -24,9 +24,12 @@ class Connection:
     def receive(self, chunk_size=500):
         numBytes = self.connectionSocket.recv(4)
         fileName = self.connectionSocket.recv(128)
-        print(numBytes, fileName)
-        numBytes = int.from_bytes(numBytes, byteorder='big')
-        fileName = fileName.decode('ascii').strip()
+        try:
+            numBytes = int.from_bytes(numBytes, byteorder='big')
+            fileName = fileName.decode('ascii').strip()
+        except Exception as e:
+            print(f"Got exception {e}. Skipping transmission...")
+            return None
         out_name = os.path.join(self.store_dir, str(fileName))
         if len(fileName) > 0:
             print("Receiving", fileName, ", writing to ", out_name, f", numBytes={numBytes}")
@@ -43,19 +46,11 @@ class Connection:
         self.connectionSocket.close()
         self.serverSocket.close()
         
-        
-class ConnectionThread:
-    def __init__(self, port, target_folder):
-        self.port = port
-        self.target_folder = target_folder
-    
-    def run(self):
-        with Connection(self.port, self.target_folder) as worker:
-            while True:
-                worker.receive()
-        
+               
 if __name__ == "__main__":
     args = parse_args(sys.argv[1:])
-    worker = ConnectionThread(args.port, target_folder=args.folder)
-    worker.run()
+    
+    with Connection(args.port, args.folder) as worker:
+        while True:
+            worker.receive()
     

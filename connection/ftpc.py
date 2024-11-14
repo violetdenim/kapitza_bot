@@ -27,19 +27,19 @@ class Connection:
     
     def send(self, filename, chunk_size=500):
         assert(os.path.exists(filename))
+        oldFile = None
         try:
-            oldFile = None
             while not oldFile:
                 try:
                     oldFile = open(filename, 'rb')
                 except Exception as e:
                     time.sleep(1) # copying is in progress!
             
-            #send file size
+            # send file size
             numBytes = os.path.getsize(filename)
             fileSize = numBytes.to_bytes(4, byteorder='big')
             self.clientSocket.send(fileSize)
-            #send file name
+            # send file name
             fileName = os.path.split(filename)[-1].rjust(128)
             self.clientSocket.send(fileName.encode('ascii'))
             print(f"Sending {filename}, numBytes={numBytes}")
@@ -49,31 +49,28 @@ class Connection:
                 self.clientSocket.send(readBytes)
                 readBytes = oldFile.read(chunk_size)
             oldFile.close()
+            return 0
         except Exception as e:
             print(f'Got error {e} during file transmission')
+            if oldFile:
+                oldFile.close()
+            return -1
         
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.clientSocket.close()
-        
-class ConnectionThread:
-    def __init__(self, ip, port, monitoring_folder):
-        self.ip, self.port = ip, port
-        self.monitoring_folder = monitoring_folder
-        os.makedirs(self.monitoring_folder, 0o777, True)
-        self.timeout = 3
-    
-    def run(self):
-        with Connection(self.ip, self.port) as worker:
-            while True:
-                files = os.listdir(self.monitoring_folder)
-                for f in files:
-                    file_name = os.path.join(self.monitoring_folder, f)
-                    worker.send(file_name)
-                    os.remove(file_name)
-                if len(files):
-                    time.sleep(self.timeout)
 
 if __name__ == "__main__":
     args = parse_args(sys.argv[1:])
-    worker = ConnectionThread(args.ip, args.port, args.folder)
-    worker.run()
+    os.makedirs(args.folder, 0o777, True)
+    with Connection(args.ip, args.port) as worker:
+        while True:
+            files = os.listdir(args.folder)
+            for f in files:
+                file_name = os.path.join(args.folder, f)
+                if worker.send(file_name) == 0:
+                    os.remove(file_name)
+                else:
+                    print('Closing connection due to an unexpected error')
+                    break # break cycle, close connection
+            if len(files) == 0:
+                time.sleep(0.1)
