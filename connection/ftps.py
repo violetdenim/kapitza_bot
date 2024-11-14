@@ -23,20 +23,21 @@ class Connection:
 
     def receive(self, chunk_size=500):
         numBytes = self.connectionSocket.recv(4)
-        numBytes = int.from_bytes(numBytes,byteorder='big')
-        fileName = self.connectionSocket.recv(20)
-        fileName = fileName.decode('ASCII').strip()
+        fileName = self.connectionSocket.recv(128)
+        print(numBytes, fileName)
+        numBytes = int.from_bytes(numBytes, byteorder='big')
+        fileName = fileName.decode('ascii').strip()
         out_name = os.path.join(self.store_dir, str(fileName))
-        print("Receiving", fileName, ", writing to ", out_name, f", numBytes={numBytes}")
-        with open(out_name, 'wb') as file:
-            while numBytes > chunk_size:
-                data = self.connectionSocket.recv(chunk_size)
-                file.write(data)
-                numBytes -= chunk_size
-            if numBytes > 0:
-                data = self.connectionSocket.recv(numBytes)
-                file.write(data)
-        return out_name
+        if len(fileName) > 0:
+            print("Receiving", fileName, ", writing to ", out_name, f", numBytes={numBytes}")
+            with open(out_name, 'wb') as file:
+                while numBytes:
+                    expectedBytes = min(numBytes, chunk_size)
+                    data = self.connectionSocket.recv(expectedBytes, )
+                    file.write(data)
+                    numBytes -= len(data)
+            return out_name
+        return None
                 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.connectionSocket.close()

@@ -28,18 +28,27 @@ class Connection:
     def send(self, filename, chunk_size=500):
         assert(os.path.exists(filename))
         try:
-            with open(filename, 'rb') as oldFile:
-                #send file size
-                fileSize = os.path.getsize(filename).to_bytes(4, byteorder='big')
-                self.clientSocket.send(fileSize)
-                #send file name
-                fileName = os.path.split(filename)[-1].rjust(20)
-                self.clientSocket.send(fileName.encode('ASCII'))
-                #loop and send file in 500 byte increments
+            oldFile = None
+            while not oldFile:
+                try:
+                    oldFile = open(filename, 'rb')
+                except Exception as e:
+                    time.sleep(1) # copying is in progress!
+            
+            #send file size
+            numBytes = os.path.getsize(filename)
+            fileSize = numBytes.to_bytes(4, byteorder='big')
+            self.clientSocket.send(fileSize)
+            #send file name
+            fileName = os.path.split(filename)[-1].rjust(128)
+            self.clientSocket.send(fileName.encode('ascii'))
+            print(f"Sending {filename}, numBytes={numBytes}")
+            #loop and send file in 500 byte increments
+            readBytes = oldFile.read(chunk_size)
+            while readBytes:
+                self.clientSocket.send(readBytes)
                 readBytes = oldFile.read(chunk_size)
-                while readBytes:
-                    self.clientSocket.send(readBytes)
-                    readBytes = oldFile.read(chunk_size)
+            oldFile.close()
         except Exception as e:
             print(f'Got error {e} during file transmission')
         
