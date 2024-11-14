@@ -202,7 +202,7 @@ class LLMProcessor(UsualLoggedClass):
             return
         chat_memory = ChatMemoryBuffer.from_defaults(token_limit=8192, chat_store=self.chat_store, chat_store_key=user_name)
         print(f"Setting engine for user={user_name}")
-        self.chat_engine = self.index.as_chat_engine(chat_mode="condense_plus_context",
+        self.chat_engine = self.index.as_chat_engine(chat_mode="context",#"condense_plus_context",
                                                      memory=chat_memory, 
                                                      system_prompt=self.get_system_prompt(user_name, user_gender=user_gender) if not custom_system_prompt else custom_system_prompt)
         self.current_user = user_name
