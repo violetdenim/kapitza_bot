@@ -145,12 +145,14 @@ if __name__ == "__main__":
     model_url = f"https://huggingface.co/kzipa/kap34_8_8_10/resolve/main/kap34_8_8_10.Q4_K_M.gguf"
     use_llama_guard = False
 
-    os.makedirs(input_folder, 0o777, True)
-    os.makedirs(output_folder, 0o777, True)
-    for f in os.listdir(output_folder):
-        os.remove(os.path.join(output_folder, f))
-    for f in os.listdir(input_folder):
-        os.remove(os.path.join(input_folder, f))
+    for work_dir in [input_folder, output_folder]:
+        os.makedirs(work_dir, 0o777, True)
+        for f in os.listdir(work_dir):
+            os.remove(os.path.join(work_dir, f))
+    # also cleanup user-logging files
+    for f in os.listdir('.'):
+        if os.path.splitext(f)[-1] == ".json":
+            os.remove(f)
 
     runnable = OneThreadProcessor(input_folder=input_folder, check_freq=1.0, output_folder=output_folder, model_url=model_url, use_llama_guard=use_llama_guard)
     asyncio.run(runnable.run())
