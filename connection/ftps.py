@@ -1,6 +1,8 @@
 import sys, os
 import argparse
 from socket import *
+import logging
+from utils.helper import formatted_datetime
 
 def parse_args(args):
     parser = argparse.ArgumentParser()
@@ -18,6 +20,7 @@ class Connection:
         self.serverSocket.listen(1)    
     
     def __enter__(self):
+        logging.info("establishing connection")
         self.connectionSocket, addr = self.serverSocket.accept()
         return self
 
@@ -28,29 +31,44 @@ class Connection:
             numBytes = int.from_bytes(numBytes, byteorder='big')
             fileName = fileName.decode('ascii').strip()
         except Exception as e:
-            print(f"Got exception {e}. Skipping transmission...")
+            msg = f"Got exception {e} during transmitted header interpretation."
+            print(msg)
+            logging.error(msg)
             return None
         out_name = os.path.join(self.store_dir, str(fileName))
         if len(fileName) > 0:
             print("Receiving", fileName, ", writing to ", out_name, f", numBytes={numBytes}")
-            with open(out_name, 'wb') as file:
-                while numBytes:
-                    expectedBytes = min(numBytes, chunk_size)
-                    data = self.connectionSocket.recv(expectedBytes, )
-                    file.write(data)
-                    numBytes -= len(data)
-            return out_name
+            try:
+                with open(out_name, 'wb') as file:
+                    while numBytes:
+                        expectedBytes = min(numBytes, chunk_size)
+                        data = self.connectionSocket.recv(expectedBytes, )
+                        file.write(data)
+                        numBytes -= len(data)
+                return out_name
+            except Exception as e:
+                msg = f"Got exception {e} during file transmission."
+                print(msg)
+                logging.error(msg)
         return None
                 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        logging.info("closing connection")
         self.connectionSocket.close()
         self.serverSocket.close()
         
                
 if __name__ == "__main__":
     args = parse_args(sys.argv[1:])
-    
+    logging.basicConfig(level=logging.DEBUG, filename="ftpc_log.log", filemode="w")
+    logging.info(formatted_datetime())
     with Connection(args.port, args.folder) as worker:
+        logging.info(f"connected through {args.port} to folder {args.folder}")
         while True:
-            worker.receive()
+            try:
+                worker.receive()
+            except Exception as e:
+                msg = f"Got exception {e}"
+                logging.error(msg)
+                print(msg)
     

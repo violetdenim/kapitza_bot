@@ -1,7 +1,8 @@
 import sys, os, time
 import argparse
 from socket import *
-
+import logging
+from utils.helper import formatted_datetime
 
 def parse_args(args):
     parser = argparse.ArgumentParser()
@@ -33,25 +34,34 @@ class Connection:
                 try:
                     oldFile = open(filename, 'rb')
                 except Exception as e:
+                    msg = f"Got exception {e} during attempt to open file in FS. Will repeat try in 1 second"
+                    print(msg)
+                    logging.error(msg)
                     time.sleep(1) # copying is in progress!
             
-            # send file size
             numBytes = os.path.getsize(filename)
             fileSize = numBytes.to_bytes(4, byteorder='big')
+            fileName = os.path.split(filename)[-1].rjust(128).encode('ascii')
+            
             self.clientSocket.send(fileSize)
-            # send file name
-            fileName = os.path.split(filename)[-1].rjust(128)
-            self.clientSocket.send(fileName.encode('ascii'))
-            print(f"Sending {filename}, numBytes={numBytes}")
-            #loop and send file in 500 byte increments
-            readBytes = oldFile.read(chunk_size)
-            while readBytes:
-                self.clientSocket.send(readBytes)
+            self.clientSocket.send(fileName)
+            msg = f"Sending {filename}, numBytes={numBytes}"
+            print(msg)
+            logging.info(msg)
+            #loop and send file in 500 byte increments            
+            while True:
                 readBytes = oldFile.read(chunk_size)
+                if readBytes and len(readBytes):
+                    logging.info(f"Sending {len(readBytes)}")
+                    self.clientSocket.send(readBytes)
+                else:
+                    break
             oldFile.close()
             return 0
         except Exception as e:
-            print(f'Got error {e} during file transmission')
+            msg = f'Got error {e} during file transmission'
+            print(msg)
+            logging.error(msg)
             if oldFile:
                 oldFile.close()
             return -1
@@ -59,18 +69,26 @@ class Connection:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.clientSocket.close()
 
+    
 if __name__ == "__main__":
     args = parse_args(sys.argv[1:])
+    logging.basicConfig(level=logging.DEBUG, filename="ftpc_log.log", filemode="w")
+    logging.info(formatted_datetime())
+    
     os.makedirs(args.folder, 0o777, True)
     with Connection(args.ip, args.port) as worker:
+        logging.info(f"connected through {args.ip}:{args.port} to folder {args.folder}")
         while True:
             files = os.listdir(args.folder)
             for f in files:
                 file_name = os.path.join(args.folder, f)
                 if worker.send(file_name) == 0:
+                    logging.info(f"removing {file_name}")
                     os.remove(file_name)
                 else:
-                    print('Closing connection due to an unexpected error')
+                    msg = 'Closing connection due to an unexpected error'
+                    print(msg)
+                    logging.error(msg)
                     break # break cycle, close connection
             if len(files) == 0:
                 time.sleep(0.1)
