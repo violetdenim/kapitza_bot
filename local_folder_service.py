@@ -81,7 +81,8 @@ class OneThreadProcessor:
         else:
             user_message = None
             file_name = input_file_name
-        async for _ in self.processor.async_process(file_to_process=file_name, user_message=user_message, output_name=target_name):
+        async for name in self.processor.async_process(file_to_process=file_name, user_message=user_message, output_name=target_name):
+            print(f"main thread got result {name}")
             pass
     
     async def run(self):
@@ -138,7 +139,10 @@ class OneThreadProcessor:
 
 if __name__ == "__main__":
     dotenv.load_dotenv()
-    
+
+    from utils.logger import logger
+    logger.log_mode = "s"
+
     input_folder = ".received"
     output_folder = ".generated"
     # model_url = "https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf"
@@ -154,5 +158,7 @@ if __name__ == "__main__":
         if os.path.splitext(f)[-1] == ".json":
             os.remove(f)
 
-    runnable = OneThreadProcessor(input_folder=input_folder, check_freq=1.0, output_folder=output_folder, model_url=model_url, use_llama_guard=use_llama_guard)
+    runnable = OneThreadProcessor(input_folder=input_folder, check_freq=1.0,
+                                  # pipeline params ...
+                                  output_folder=output_folder, model_url=model_url, use_llama_guard=use_llama_guard, n_tts=4)
     asyncio.run(runnable.run())

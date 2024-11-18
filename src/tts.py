@@ -155,12 +155,17 @@ def _demo_generation():
     input_queue = Queue()
     for i, sentence in enumerate(_split_text(text, min_length=128)):
         input_queue.put([sentence, ".wav", f"test_{i}.wav"])
-    input_queue.put(9)
+    # input_queue.put(9)
     
     my_thread = TTSThread(input_queue, None, checkpoint_path=os.environ.get("AUDIO_PATH"))
     my_thread.start()
     input_queue.join()
-    # my_thread.kill()
+    print("Empty input_queue!")
+    for i, sentence in enumerate(_split_text(text, min_length=128)):
+        input_queue.put([sentence, ".wav", f"test_{i}.wav"])
+    input_queue.join()
+    print("Empty input_queue!")
+    my_thread.kill()
     
 def _push_files_to_folder(folder=".received"):
     os.makedirs(folder, 0o777, True)

@@ -156,13 +156,16 @@ class LLMProcessor(UsualLoggedClass):
         self.current_user = None
         self.prompt = None
         self.prompt_path = prompt_path
+        
+        self.use_llama_guard = use_llama_guard
+        
         if prepare_for_audio:
             self.normalizer = RUNorm()
             self.normalizer.load(model_size="big", device="cpu")
             self.postprocessing_fn = lambda x: self.normalizer.norm(drop_ending(strip_substr(x, ['assistant', ' ', '\n']).replace("Вы welcome", "Пожалуйста")))
         else:
             self.postprocessing_fn = lambda x: drop_ending(strip_substr(x, ['assistant', ' ', '\n']).replace("Вы welcome", "Пожалуйста"))
-        if use_llama_guard:
+        if self.use_llama_guard:
             from llama_index.core.llama_pack import download_llama_pack
             LlamaGuardModeratorPack = download_llama_pack("LlamaGuardModeratorPack")#, "../llamaguard_pack")
             self.llamaguard_pack = LlamaGuardModeratorPack()
@@ -209,7 +212,7 @@ class LLMProcessor(UsualLoggedClass):
 
     def process_prompt(self, prompt):
         print(f"Current user={self.current_user}")
-        if self.llamaguard_pack: # quick check of user prompt
+        if self.use_llama_guard: # quick check of user prompt
             moderator_response_for_input = self.llamaguard_pack.run(prompt)
             if moderator_response_for_input != "safe":
                 return "Пожалуй, лучше поговорить на другую тему."
@@ -219,12 +222,11 @@ class LLMProcessor(UsualLoggedClass):
 
     async def async_process_prompt(self, prompt):
         print(f"Current user={self.current_user}")
-        if self.llamaguard_pack: # quick check of user prompt
+        if self.use_llama_guard: # quick check of user prompt
             moderator_response_for_input = self.llamaguard_pack.run(prompt)
             if moderator_response_for_input != "safe":
                 yield "Пожалуй, лучше поговорить на другую тему."
                 return
-
         response = self.chat_engine.stream_chat(prompt)
         # accumulate sentences and yield them back
         text = ""

@@ -1,7 +1,7 @@
 import os
 import dotenv
 import torchaudio, torch
-os.system("pip install -U accelerate")
+# os.system("pip install -U accelerate")
 from src.llm import LLMProcessor
 from src.tts import TTSProcessor, TTSThread
 from src.asr import ASRProcessor
@@ -16,23 +16,32 @@ class Pipeline(UsualLoggedClass):
                  model_url=f"https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf",
                  use_llama_guard=False,
                  output_folder=".generated",
-                 prepare_for_audio=True):
-                 
-        super().__init__()
+                 prepare_for_audio=True,
+                 n_tts=4):
         # model_url = "https://huggingface.co/QuantFactory/Meta-Llama-3.1-8B-GGUF/resolve/main/Meta-Llama-3.1-8B.Q4_K_M.gguf?download=true"
         hf_token = os.environ.get('HF_AUTH')
+        self.n_tts = n_tts
         if prepare_for_audio:
             self.asr = ASRProcessor(hf_token=hf_token)
             self.queue = Queue()
-            self.tts = TTSThread(self.queue, None, checkpoint_path=os.environ.get("AUDIO_PATH"), hf_token=hf_token, output_dir=output_folder)    
-            self.tts.start() # run in separate thread
+            self.o_queue = Queue()
+            self.ttses = [TTSThread(self.queue, self.o_queue, checkpoint_path=os.environ.get("AUDIO_PATH"), hf_token=hf_token, output_dir=output_folder)
+                          for i in range(self.n_tts)]   
+            for i in range(self.n_tts):
+                self.ttses[i].start() # run in separate thread
         else:
             self.asr = None
-            self.tts = None
+            self.ttses = [None for _ in range(self.n_tts)]
             self.queue = None
 
         self.llm = LLMProcessor(os.environ.get("PROMPT_PATH"), os.environ.get("RAG_PATH"),
                 model_url=model_url, use_llama_guard=use_llama_guard, prepare_for_audio=prepare_for_audio)
+        
+        super().__init__()
+        
+    @property
+    def tts(self):
+        return self.ttses[0]
 
     def set_user(self, user_name, user_gender):
         self.llm.set_engine(user_name, user_gender)
@@ -58,14 +67,12 @@ class Pipeline(UsualLoggedClass):
     async def async_process(self, file_to_process=None, user_message=None, output_mode='audio', output_name=None):
         assert((file_to_process is None) ^ (user_message is None))
         assert((output_mode == "text") or (self.tts))
-        
         def construct_name(output_name, index):
             iteration_name = None
             if output_name:
                 name, ext = os.path.splitext(output_name)
                 iteration_name = name + "_" + str(index) + ext
             return iteration_name
-
         if user_message is None and self.asr:
             user_message = self.asr.get_text(file_to_process)
         if user_message is None: # invalid input path, just skip
@@ -76,6 +83,7 @@ class Pipeline(UsualLoggedClass):
             return
         index = 0
         audio_block = ""
+        n_outputs = 0
         async for sentence in self.llm.async_process_prompt(user_message):
             meaningful = sum(1 for c in sentence if ord('a') <= ord(c) <= ord('z') or ord('A') <= ord(c) <= ord('Z') or ord('а') <= ord(c) <= ord('я') or ord('А') <= ord(c) <= ord('Я'))
             if meaningful == 0:
@@ -93,17 +101,40 @@ class Pipeline(UsualLoggedClass):
                     if len(audio_block):
                         print(f"Generating audio for text `{audio_block}`")
                         self.queue.put([audio_block, ".wav" if output_mode == "audio" else ".ogg", construct_name(output_name, index)])
-                        yield None # do nothing, second process will do generation and put it to folder
+                        # yield None # do nothing, second process will do generation and put it to folder
+                        # yielding will be done later
                         index += 1
+                        n_outputs += 1
                     audio_block = sentence
+            try:
+                while True:
+                    output = self.o_queue.get_nowait()
+                    n_outputs -= 1
+                    yield output # yield some ready results
+            except Exception as e:
+                pass
         if len(audio_block):
             print(f"Generating audio for text `{audio_block}`")
             self.queue.put([audio_block, ".wav" if output_mode == "audio" else ".ogg", construct_name(output_name, index)])
-        self.queue.put(["", "", "done"])
+            n_outputs += 1
+        # wait for all queues to finish and write to output `done`
+        self.queue.join()
+        # if something wasn't finished until this moment, it will be passed later
+        while n_outputs: 
+            yield self.o_queue.get() # yield other ready results
+            n_outputs -= 1
+            
+        # write 'done' marker to output folder
+        end_marker = os.path.join(self.tts.engine.folder, 'done')
+        with open(end_marker, 'w') as m:
+            m.write('')
+        print('writing `done`')
+        return
 
     def __exit__(self):
-        self.queue.put(9) # killing signal
-        self.queue.join() # wait for all processing to finish
+        # kill all TTS threads
+        for i in range(self.n_tts):
+            self.ttses[i].kill()
 
 
 def concat_wavs(inputs, output):

@@ -47,14 +47,20 @@ def parameterized_logger(log_mode):
 class IndependentLoggedClass:
     def __init__(self, log_mode):
         for method in list(set(item for item in dir(self) if not item.startswith('_'))-set(vars(self).keys())):
-            setattr(self, method, parameterized_logger(log_mode=log_mode)(getattr(self, method)))
+            try:
+                setattr(self, method, parameterized_logger(log_mode=log_mode)(getattr(self, method)))
+            except Exception as e:
+                pass
 
 # derive from this class to log all methods
 # user logger.log_mode to regulate all classes, that derive from this interface
 class UsualLoggedClass:
     def __init__(self):
         for method in list(set(item for item in dir(self) if not item.startswith('_'))-set(vars(self).keys())):
-            setattr(self, method, logger(getattr(self, method)))
+            try:
+                setattr(self, method, logger(getattr(self, method)))
+            except Exception as e:
+                pass
 
 class __Test__:
     def __init__(self):
@@ -89,10 +95,26 @@ class __Test__:
     def __test_usecase3(self):
         class MyClass(UsualLoggedClass):
             def __init__(self):
-                super().__init__("s")
+                super().__init__()
 
             def my_method(self):
                 time.sleep(1)
+
+        logger.log_mode = "s"
+        logged_class = MyClass()
+        logged_class.my_method()
+    
+    def __test_usecase4(self):
+        class MyClass(UsualLoggedClass):
+            def __init__(self):
+                super().__init__()
+
+            def my_method(self):
+                time.sleep(1)
+            
+            @property
+            def x(self):
+                return 1
 
         logger.log_mode = "s"
         logged_class = MyClass()
