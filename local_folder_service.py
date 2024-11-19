@@ -160,5 +160,5 @@ if __name__ == "__main__":
 
     runnable = OneThreadProcessor(input_folder=input_folder, check_freq=1.0,
                                   # pipeline params ...
-                                  output_folder=output_folder, model_url=model_url, use_llama_guard=use_llama_guard, n_tts=4)
+                                  output_folder=output_folder, model_url=model_url, use_llama_guard=use_llama_guard, n_tts=2)
     asyncio.run(runnable.run())

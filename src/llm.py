@@ -115,6 +115,10 @@ class LLMProcessor(UsualLoggedClass):
             model_url = None
         else:
             model_path = None
+            
+        self.model_url = model_url
+        self.model_path = model_path
+        
         if is_gguf:
             Settings.llm = LlamaCPP(
                 # You can pass in the URL to a GGML model to download it automatically
@@ -173,9 +177,8 @@ class LLMProcessor(UsualLoggedClass):
             self.llamaguard_pack = None
 
     def get_system_prompt(self, user_name, user_gender="F"):
-        if self.prompt is None:
-            with open(self.prompt_path, "r", encoding='utf-8') as f:
-                self.prompt = '\n'.join(f.readlines())
+        with open(self.prompt_path, "r", encoding='utf-8') as f:
+            self.prompt = '\n'.join(f.readlines())
         self.prompt = self.prompt.replace("{user_name}", user_name)
         self.prompt = self.prompt.replace("{user_gender}", "женщина" if user_gender == "F" else "мужчина")
         date = datetime.datetime.now().date()
@@ -192,24 +195,31 @@ class LLMProcessor(UsualLoggedClass):
         if user_name and reset and os.path.exists(user_name + ".json"):
             os.remove(user_name + ".json")
             self.chat_store = SimpleChatStore()
+            print(f"Reseting. Creating chat store for username {user_name}")
         elif not user_name or user_name != self.current_user:
             if self.current_user is not None:
                 self.chat_store.persist(persist_path=self.current_user + ".json")
+                print(f"Storing chat store for username {self.current_user}")
             if user_name is not None and os.path.exists(user_name + ".json"):
                 self.chat_store = SimpleChatStore.from_persist_path(persist_path=user_name + ".json")
+                print(f"Loading chat store for username {user_name}")
             else:
                 self.chat_store = SimpleChatStore()
                 if user_name is None:
                     user_name = "user" # for technical usage of pipeline
+                print(f"Creating chat store for username {user_name}")
         else:
+            print("set_engine: no effect")
             return
-        chat_memory = ChatMemoryBuffer.from_defaults(token_limit=8192, chat_store=self.chat_store, chat_store_key=user_name)
-        print(f"Setting engine for user={user_name}")
-        self.chat_engine = self.index.as_chat_engine(chat_mode="context",#"condense_plus_context",
-                                                     memory=chat_memory, 
-                                                     system_prompt=self.get_system_prompt(user_name, user_gender=user_gender) if not custom_system_prompt else custom_system_prompt)
+        
         self.current_user = user_name
-
+        
+        new_prompt = self.get_system_prompt(self.current_user, user_gender=user_gender) if not custom_system_prompt else custom_system_prompt
+        chat_memory = ChatMemoryBuffer.from_defaults(token_limit=8192, chat_store=self.chat_store, chat_store_key=self.current_user)
+        self.chat_engine = self.index.as_chat_engine(chat_mode="condense_plus_context", #"simple", #"context", #
+                                                     memory=chat_memory, 
+                                                     system_prompt=new_prompt)
+               
     def process_prompt(self, prompt):
         print(f"Current user={self.current_user}")
         if self.use_llama_guard: # quick check of user prompt
