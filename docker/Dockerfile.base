@@ -62,5 +62,6 @@ RUN git lfs install
 # RUN pip install pyaudio wave
 RUN pip install argparse
 RUN pip install llama-index-llms-huggingface
+RUN apt install ffmpeg -y
 # ENTRYPOINT ["conda", "run", "--no-capture-output", "-n", "kap_env", "python", "run.py"]
 # CMD python run.py
