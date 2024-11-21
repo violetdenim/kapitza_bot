@@ -6,6 +6,7 @@ voice
 .received_feedback
 
 .env
-*.wav
-files
-.env
+/*.wav
+_experiments/*.wav
+*.log
+
