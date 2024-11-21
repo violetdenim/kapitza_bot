@@ -32,21 +32,39 @@ docker build -t kszipa/kapitza-server -f docker/Dockerfile.server .
 docker build -t kszipa/kapitza-client -f docker/Dockerfile.client .
 
 # push them to hub
-docker push kszipa/kapitza
-docker push kszipa/kapitza-bot
-docker push kszipa/kapitza-server
-docker push kszipa/kapitza-client
+docker push kszipa/kapitza:folder_service
+docker push kszipa/kapitza-bot:folder_service
+docker push kszipa/kapitza-server:folder_service
+docker push kszipa/kapitza-client:folder_service
 ```
 
 ```
 # pull docker containers to target system
-docker pull kszipa/kapitza-bot
-docker pull kszipa/kapitza-server
-docker pull kszipa/kapitza-client
+docker pull kszipa/kapitza:folder_service
+docker pull kszipa/kapitza-bot:folder_service
+docker pull kszipa/kapitza-server:folder_service
+docker pull kszipa/kapitza-client:folder_service
 
 # test docker containers
-docker run --rm --gpus all -t --network=host kszipa/kapitza-bot
-docker run --rm --gpus all -t --network=host kszipa/kapitza-server
-docker run --rm --gpus all -t --network=host kszipa/kapitza-client
+docker run --rm --gpus all -it --network=host kszipa/kapitza:folder_service
+docker run --rm --gpus all -t --network=host kszipa/kapitza-bot:folder_service
+docker run --rm --gpus all -t --network=host kszipa/kapitza-server:folder_service
+docker run --rm --gpus all -t --network=host kszipa/kapitza-client:folder_service
 ```
 
+Запуск и настройка интерактивного контейнера:
+```
+docker run --rm --gpus all -it --network=host kszipa/kapitza:folder_service
+```
+```
+conda init
+source /root/.bashrc
+conda activate kap_env
+python local_folder_service.py
+```
+Attach second shell to the running container:
+```
+docker ps
+# insert suited container index into command below
+docker exec -ti {cid} sh
+```
