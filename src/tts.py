@@ -63,6 +63,7 @@ class TTSProcessor(UsualLoggedClass):
         wave = torchaudio.functional.resample(wave, 24_000, 16_000)
         print(f"Saving {tmp_filename}")
         torchaudio.save(tmp_filename, wave.cpu(), 16_000, encoding="PCM_S", backend="soundfile", bits_per_sample=16)
+        print(f"{tmp_filename} saved")
         return tmp_filename
 
 

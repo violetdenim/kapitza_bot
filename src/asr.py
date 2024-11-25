@@ -60,11 +60,12 @@ class ASRProcessor(UsualLoggedClass):
                     # don't kill, just skip
                     print(f"Can not read file {audio_file}.")
                     return None
-                
+        default_device = torch.get_default_device()
+        
         if self.enhancing_model is not None:
             if sr != self.enhancing_rate:
                 audio = torchaudio.functional.resample(audio, sr, self.enhancing_rate)
-            audio = enhance(self.enhancing_model, self.enhancing_state, audio.to(torch.get_default_device()))
+            audio = enhance(self.enhancing_model, self.enhancing_state, audio.to(default_device))
             sr = self.enhancing_rate
         
         rate = 16_000
@@ -72,7 +73,7 @@ class ASRProcessor(UsualLoggedClass):
             audio = torchaudio.functional.resample(audio, sr, rate)
             sr = rate
         parts = self.vad_pipeline({"waveform": audio, "sample_rate": rate})
-        default_device = torch.get_default_device()
+        
         torch.set_default_device('cpu')
         text = ""
         for segment, _, _ in parts.itertracks(yield_label=True):
