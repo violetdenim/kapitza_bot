@@ -4,9 +4,10 @@ from pyannote.audio.pipelines import VoiceActivityDetection
 import torch, torchaudio, os
 import time
 from utils.logger import UsualLoggedClass
+from df.enhance import enhance, init_df
 
 class ASRProcessor(UsualLoggedClass):
-    def __init__(self, model_id="openai/whisper-large-v3", hf_token=os.environ.get('HF_AUTH')) -> None:
+    def __init__(self, model_id="openai/whisper-large-v3", hf_token=os.environ.get('HF_AUTH'), enhance_input=True) -> None:
         # use this interface to enable\disable logging on application level
         super().__init__()
         device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -37,6 +38,12 @@ class ASRProcessor(UsualLoggedClass):
             "min_duration_off": 0.0
         }
         self.vad_pipeline.instantiate(HYPER_PARAMETERS)
+        # enable sound enhancing
+        if enhance_input:
+            self.enhancing_model, enhahcing_state, _ = init_df() 
+            self.enhancing_rate = enhahcing_state.sr()
+        else:
+            self.enhancing_model = None
         
     def get_text(self, audio_file):
         rate = 16_000
@@ -44,7 +51,9 @@ class ASRProcessor(UsualLoggedClass):
         sleeping_period = 3.0
         for i in range(load_attempts_count):
             try:
-                sample = torchaudio.load(audio_file)
+                audio, sr = torchaudio.load(audio_file)
+                if audio.shape[0] != 1: # keep only first channel
+                    audio = audio[0:1, :]
             except Exception as e:
                 if i < load_attempts_count - 1:
                     time.sleep(sleeping_period)
@@ -52,11 +61,20 @@ class ASRProcessor(UsualLoggedClass):
                     # don't kill, just skip
                     print(f"Can not read file {audio_file}.")
                     return None
-        voice = torchaudio.functional.resample(sample[0], sample[1], rate)
+                
+        if self.enhancing_model is not None:
+            if sr != self.enhancing_rate:
+                audio = torchaudio.functional.resample(audio, sr, self.enhancing_rate)
+            audio = enhance(self.enhancing_model, self.enhancing_rate, audio)
+            sr = self.enhancing_rate
+        
+        if sr != rate:
+            audio = torchaudio.functional.resample(audio, sr, rate)
+            sr = rate
 
-        parts = self.vad_pipeline({"waveform": voice, "sample_rate": rate})
+        parts = self.vad_pipeline({"waveform": audio, "sample_rate": rate})
         text = ""
         for segment, _, _ in parts.itertracks(yield_label=True):
-            text += self.pipe(voice[0, int(segment.start * rate):int(segment.end * rate)].numpy().flatten())["text"]
+            text += self.pipe(audio[0, int(segment.start * rate):int(segment.end * rate)].numpy().flatten())["text"]
             text += '\n' # end of sentence
         return text

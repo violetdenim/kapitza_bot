@@ -49,8 +49,9 @@ RUN pip install llama-index llama-index-embeddings-huggingface
 RUN pip install --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu121 llama-cpp-python 
 RUN pip install llama-index-llms-llama_cpp 
 RUN pip install TTS pyannote.audio accelerate
-COPY . .
+RUN pip install deepfilternet
 RUN pip install huggingface_hub
+COPY . .
 RUN python hf_login.py
 RUN git config --global credential.helper store
 RUN apt-get install git-lfs
