@@ -95,7 +95,7 @@ class Pipeline(UsualLoggedClass):
                 if meaningful < 5: # at least two letters
                     print(f"Attention! Short sentence `{sentence}` is passed to TTS")
                 
-                if len(audio_block) + len(sentence) < 128: # accumulate short sentences to improve audio generation
+                if len(audio_block) + len(sentence) < 0: #128: # accumulate short sentences to improve audio generation
                     audio_block += " " + sentence
                 else:
                     if len(audio_block):

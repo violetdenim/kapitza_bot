@@ -40,13 +40,13 @@ class ASRProcessor(UsualLoggedClass):
         self.vad_pipeline.instantiate(HYPER_PARAMETERS)
         # enable sound enhancing
         if enhance_input:
-            self.enhancing_model, enhahcing_state, _ = init_df() 
-            self.enhancing_rate = enhahcing_state.sr()
+            self.enhancing_model, self.enhancing_state, _ = init_df() 
+            self.enhancing_rate = self.enhancing_state.sr()
         else:
             self.enhancing_model = None
         
     def get_text(self, audio_file):
-        rate = 16_000
+        print('Entered ASR: get_text')
         load_attempts_count = 5
         sleeping_period = 3.0
         for i in range(load_attempts_count):
@@ -63,18 +63,29 @@ class ASRProcessor(UsualLoggedClass):
                     return None
                 
         if self.enhancing_model is not None:
+            print("Perform enhancing")
             if sr != self.enhancing_rate:
                 audio = torchaudio.functional.resample(audio, sr, self.enhancing_rate)
-            audio = enhance(self.enhancing_model, self.enhancing_rate, audio)
+            print("Perform enhancing actually")
+            audio = enhance(self.enhancing_model, self.enhancing_state, audio.to(torch.get_default_device()))
             sr = self.enhancing_rate
+            print("Finished enhancing")
         
+        rate = 16_000
         if sr != rate:
             audio = torchaudio.functional.resample(audio, sr, rate)
             sr = rate
-
+        print('ASR: starting vad_pipeline')
         parts = self.vad_pipeline({"waveform": audio, "sample_rate": rate})
+        print('ASR: finished vad_pipeline')
+        default_device = torch.get_default_device()
+        torch.set_default_device('cpu')
         text = ""
+        print('ASR start')
         for segment, _, _ in parts.itertracks(yield_label=True):
-            text += self.pipe(audio[0, int(segment.start * rate):int(segment.end * rate)].numpy().flatten())["text"]
+            text += self.pipe(audio[0, int(segment.start * rate):int(segment.end * rate)].cpu().numpy().flatten())["text"]
             text += '\n' # end of sentence
+        print('ASR end')
+        torch.set_default_device(default_device)
+        print(f'ASR detected: {text}')
         return text

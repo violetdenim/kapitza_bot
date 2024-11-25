@@ -15,6 +15,7 @@ from runorm import RUNorm
 from utils.string_utils import *
 from utils.logger import UsualLoggedClass
 import time
+import torch
 
 
 # from typing import List, Optional, Sequence
@@ -107,8 +108,9 @@ class LLMProcessor(UsualLoggedClass):
         prepare_for_audio specifies whether to apply postprocessing or not
         """
         super().__init__()
+        self.device = torch.get_default_device()
         documents = SimpleDirectoryReader(rag_folder, recursive=True).load_data() # "data"
-        Settings.embed_model = HuggingFaceEmbedding(model_name=embedding_name)
+        Settings.embed_model = HuggingFaceEmbedding(model_name=embedding_name, device=self.device)
         is_gguf = '.gguf' in model_url
         if not model_url.startswith("http"):
             model_path = model_url
@@ -132,7 +134,7 @@ class LLMProcessor(UsualLoggedClass):
                 generate_kwargs={},
                 # kwargs to pass to __init__()
                 # set to at least 1 to use GPU
-                model_kwargs={"n_gpu_layers": 33},
+                model_kwargs={"n_gpu_layers": 33, "split_mode": 0, "tensor_split": None, "main_gpu": torch.get_default_device().index},
                 # transform inputs into Llama2 format
                 messages_to_prompt=messages_to_prompt_v3_instruct, # messages_to_prompt_qwen,
                 completion_to_prompt=completion_to_prompt_v3_instruct, # completion_to_prompt_qwen,
@@ -165,7 +167,7 @@ class LLMProcessor(UsualLoggedClass):
         
         if prepare_for_audio:
             self.normalizer = RUNorm()
-            self.normalizer.load(model_size="big", device="cpu")
+            self.normalizer.load(model_size="big", device=self.device)
             self.postprocessing_fn = lambda x: self.normalizer.norm(drop_ending(strip_substr(x, ['assistant', ' ', '\n']).replace("Вы welcome", "Пожалуйста")))
         else:
             self.postprocessing_fn = lambda x: drop_ending(strip_substr(x, ['assistant', ' ', '\n']).replace("Вы welcome", "Пожалуйста"))
@@ -216,7 +218,7 @@ class LLMProcessor(UsualLoggedClass):
         
         new_prompt = self.get_system_prompt(self.current_user, user_gender=user_gender) if not custom_system_prompt else custom_system_prompt
         chat_memory = ChatMemoryBuffer.from_defaults(token_limit=8192, chat_store=self.chat_store, chat_store_key=self.current_user)
-        self.chat_engine = self.index.as_chat_engine(chat_mode="condense_plus_context", #"simple", #"context", #
+        self.chat_engine = self.index.as_chat_engine(chat_mode="simple", #"condense_plus_context", 
                                                      memory=chat_memory, 
                                                      system_prompt=new_prompt)
                

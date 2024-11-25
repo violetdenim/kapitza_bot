@@ -36,7 +36,7 @@ class OneThreadProcessor:
             username = "Дорогой друг"
             usergender = "M"
         else:
-            custom_prompt = custom_prompt = """Ты - система аутентификации для ASR. Пользователя просили представиться. Выведи в ответ только его или её имя в именительном (звательном) падеже и отчество, если он указал его.
+            custom_prompt = """Ты - система аутентификации для ASR. Пользователя просили представиться. Выведи в ответ только его или её имя в именительном (звательном) падеже и отчество, если он указал его.
                 Фамилию игнорируй, если пользователь специально не обозначил полное обращение. Если ввод нерелевантен, выведи !
 
                 Например:
@@ -136,10 +136,14 @@ class OneThreadProcessor:
                         if os.path.exists(_full_path):
                             os.remove(_full_path)
                     print(f"Finished cleanup. Resume execution, starting with newuser")
+                    self.object_state = 0
 
 if __name__ == "__main__":
     dotenv.load_dotenv()
-
+    # allocate last available graphics card as default device
+    import torch
+    torch.set_default_device(torch.device(f'cuda:{torch.cuda.device_count()-1}'))
+    
     from utils.logger import logger
     logger.log_mode = "s"
 

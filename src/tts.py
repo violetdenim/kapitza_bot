@@ -39,16 +39,19 @@ class TTSProcessor(UsualLoggedClass):
                                    vocab_path=xtts_vocab, speaker_file_path=xtts_speaker, use_deepspeed=False)
 
         if torch.cuda.is_available():
-            self.model.cuda()
+            self.model.to(torch.get_default_device())
+        print(f"TTS uses {torch.get_default_device()}")
         self.gpt_cond_latent, self.speaker_embedding = self.model.get_conditioning_latents(audio_path=speaker_audio_file,
                                                                                            gpt_cond_len=self.model.config.gpt_cond_len,
                                                                                            max_ref_length=self.model.config.max_ref_len,
                                                                                            sound_norm_refs=True)
 
     def get_audio(self, text, format=".wav", output_name=None):
+        print("get_audio started")
         out = self.model.inference(text=text, language='ru', gpt_cond_latent=self.gpt_cond_latent, speaker_embedding=self.speaker_embedding,
                                    temperature=0.2, repetition_penalty=10.0, top_k=50, top_p=0.85, speed=0.95,
                                    enable_text_splitting=True)
+        print("get_audio finished")
         if output_name is None:
             tmp_filename = next(tempfile._get_candidate_names()) + format
             tmp_filename = os.path.join(self.folder, tmp_filename)
@@ -59,7 +62,7 @@ class TTSProcessor(UsualLoggedClass):
         wave = torch.tensor(out["wav"]).unsqueeze(0)
         wave = torchaudio.functional.resample(wave, 24_000, 16_000)
         print(f"Saving {tmp_filename}")
-        torchaudio.save(tmp_filename, wave, 16_000, encoding="PCM_S", backend="soundfile", bits_per_sample=16)
+        torchaudio.save(tmp_filename, wave.cpu(), 16_000, encoding="PCM_S", backend="soundfile", bits_per_sample=16)
         return tmp_filename
 
 
