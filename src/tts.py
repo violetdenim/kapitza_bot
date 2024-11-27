@@ -36,7 +36,7 @@ class TTSProcessor(UsualLoggedClass):
         config.load_json(xtts_config)
         self.model = Xtts.init_from_config(config)
         self.model.load_checkpoint(config, checkpoint_path=xtts_checkpoint,
-                                   vocab_path=xtts_vocab, speaker_file_path=xtts_speaker, use_deepspeed=False)
+                                   vocab_path=xtts_vocab, speaker_file_path=xtts_speaker, use_deepspeed=True)
 
         if torch.cuda.is_available():
             self.model.to(torch.get_default_device())
@@ -76,37 +76,44 @@ class TTSThread(threading.Thread):
         self.engine = TTSProcessor(**params)
         self.output = output
         self._kill = threading.Event()
+        self._enabled = threading.Event()
 
     def run(self):
         while True:
             if self._kill.wait(0.05):
                 print("Killing TTSThread: kill signal")
                 return
-            package = self.input.get(block = True)
-            if isinstance(package, int) and package == 9: # kill
-                self.input.task_done()
-                print("Killing TTSThread: end of queue")
-                return
+            if self._enabled.wait(0.05):
+                package = self.input.get(block = True)
+                if isinstance(package, int) and package == 9: # kill
+                    self.input.task_done()
+                    print("Killing TTSThread: end of queue")
+                    return
 
-            assert(isinstance(package, tuple) or isinstance(package, list))
-            assert(len(package) == 3)    
-            text, format, output_name = package
-            if format != "":
-                result = self.engine.get_audio(text=text, format=format, output_name=output_name)
-            else:
-                end_marker = os.path.join(self.engine.folder, output_name)
-                # write 'done' marker
-                print(f"Saving {end_marker}")
-                with open(end_marker, 'w') as m:
-                    m.write('')
-                result = output_name
-            if self.output:
-                self.output.put(result)
-            self.input.task_done()
+                assert(isinstance(package, tuple) or isinstance(package, list))
+                assert(len(package) == 3)    
+                text, format, output_name = package
+                if format != "":
+                    result = self.engine.get_audio(text=text, format=format, output_name=output_name)
+                else:
+                    end_marker = os.path.join(self.engine.folder, output_name)
+                    # write 'done' marker
+                    print(f"Saving {end_marker}")
+                    with open(end_marker, 'w') as m:
+                        m.write('')
+                    result = output_name
+                if self.output:
+                    self.output.put(result)
+                self.input.task_done()
             
     def kill(self):
         self._kill.set()
-            
+    
+    def enable(self):
+        self._enabled.set()
+    
+    def disable(self):
+        self._enabled.clear()
 
 def _split_text(text, min_length=128):
     import re
@@ -182,7 +189,10 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         mode = int(sys.argv[1])
     else:
-        mode = 0
+        mode = 2
+    import torch
+    torch.set_default_device(f'cuda:{torch.cuda.device_count()-1}')
+    
     match mode:
         case 0: _do_folder_monitoring()
         case 1: _push_files_to_folder()

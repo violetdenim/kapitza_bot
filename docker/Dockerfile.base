@@ -51,6 +51,7 @@ RUN pip install llama-index-llms-llama_cpp
 RUN pip install TTS pyannote.audio accelerate
 RUN pip install deepfilternet
 RUN pip install huggingface_hub
+RUN DS_BUILD_TRANSFORMER_INFERENCE=1 pip install deepspeed
 COPY . .
 RUN python hf_login.py
 RUN git config --global credential.helper store

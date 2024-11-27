@@ -142,7 +142,7 @@ if __name__ == "__main__":
     dotenv.load_dotenv()
     # allocate last available graphics card as default device
     import torch
-    torch.set_default_device(torch.device(f'cuda:{torch.cuda.device_count()-1}'))
+    torch.set_default_device(f'cuda:{torch.cuda.device_count()-1}')
     
     from utils.logger import logger
     logger.log_mode = "s"
@@ -163,6 +163,5 @@ if __name__ == "__main__":
             os.remove(f)
 
     runnable = OneThreadProcessor(input_folder=input_folder, check_freq=1.0,
-                                  # pipeline params ...
                                   output_folder=output_folder, model_url=model_url, use_llama_guard=use_llama_guard, n_tts=2)
     asyncio.run(runnable.run())

@@ -84,6 +84,11 @@ class Pipeline(UsualLoggedClass):
         index = 0
         audio_block = ""
         n_outputs = 0
+        
+        # enable only first-TTS, disable all others
+        self.ttses[0].enable()
+        for i in range(1, self.n_tts):
+            self.ttses[i].disable()
         async for sentence in self.llm.async_process_prompt(user_message):
             meaningful = sum(1 for c in sentence if ord('a') <= ord(c) <= ord('z') or ord('A') <= ord(c) <= ord('Z') or ord('а') <= ord(c) <= ord('я') or ord('А') <= ord(c) <= ord('Я'))
             if meaningful == 0:
@@ -117,6 +122,10 @@ class Pipeline(UsualLoggedClass):
             print(f"Generating audio for text `{audio_block}`")
             self.queue.put([audio_block, ".wav" if output_mode == "audio" else ".ogg", construct_name(output_name, index)])
             n_outputs += 1
+        # enable all tts
+        for i in range(self.n_tts):
+            self.ttses[i].enable()
+            
         # wait for all queues to finish and write to output `done`
         self.queue.join()
         # if something wasn't finished until this moment, it will be passed later
