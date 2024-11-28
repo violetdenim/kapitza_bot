@@ -36,7 +36,7 @@ class TTSProcessor(UsualLoggedClass):
         config.load_json(xtts_config)
         self.model = Xtts.init_from_config(config)
         self.model.load_checkpoint(config, checkpoint_path=xtts_checkpoint,
-                                   vocab_path=xtts_vocab, speaker_file_path=xtts_speaker, use_deepspeed=False)
+                                   vocab_path=xtts_vocab, speaker_file_path=xtts_speaker, use_deepspeed=True)
 
         if torch.cuda.is_available():
             self.model.to(torch.get_default_device())
@@ -194,13 +194,13 @@ if __name__ == "__main__":
         mode = int(sys.argv[1])
     else:
         mode = 2
-    import torch
+    import torch, time
     torch.set_default_device(f'cuda:{torch.cuda.device_count()-1}')
     
     match mode:
         case 0: _do_folder_monitoring()
         case 1: _push_files_to_folder()
-        case 2: _demo_generation()
+        case 2: t = time.time_ns();_demo_generation(); print((time.time_ns() - t)//1000.000/1000, " s")
     
     
     

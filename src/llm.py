@@ -12,9 +12,31 @@ from llama_index.llms.llama_cpp.llama_utils import ( messages_to_prompt_v3_instr
 import os, datetime
 # tool to normalize model's output
 from runorm import RUNorm
-from utils.string_utils import *
-from utils.logger import UsualLoggedClass
+# from utils.string_utils import *
+# from utils.logger import UsualLoggedClass
 import torch
+
+def strip_substr(text, sub_strings):
+    n = len(text)
+    n_old = n + 1
+    while n < n_old:
+        for substr in sub_strings:
+            text = text.strip(substr)
+        n, n_old = len(text), n
+    return text
+
+def drop_ending(some_text, endings='.!?'):
+    p = len(some_text) - 1
+    while p >= 0 and some_text == ' ':
+        p -= 1
+    if p < 0 or some_text[p] in endings:
+        return some_text[:p+1]
+    while p >= 0 and some_text[p] not in endings:
+        p -= 1
+    if p < 0:
+        return ""
+    return some_text[:p+1]
+
 
 def completion_to_prompt_qwen(completion):
    return f"<|im_start|>system\n<|im_end|>\n<|im_start|>user\n{completion}<|im_end|>\n<|im_start|>assistant\n"
@@ -36,7 +58,7 @@ def messages_to_prompt_qwen(messages):
 
     return prompt
 
-class LLMProcessor(UsualLoggedClass):
+class LLMProcessor:#UsualLoggedClass):
     def __init__(self, prompt_path, rag_folder,
                  embedding_name='BAAI/bge-m3',# 'deepvk/USER-bge-m3' #'intfloat/multilingual-e5-large-instruct' #"BAAI/bge-base-en-v1.5"
                  model_url=f"https://huggingface.co/kzipa/kap34_8_8_10/resolve/main/kap34_8_8_10.Q4_K_M.gguf", #"https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf?download=true",
