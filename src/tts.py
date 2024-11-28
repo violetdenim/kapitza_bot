@@ -110,9 +110,11 @@ class TTSThread(threading.Thread):
         self._kill.set()
     
     def enable(self):
+        print('TTSThread enabled')
         self._enabled.set()
     
     def disable(self):
+        print('TTSThread disabled')
         self._enabled.clear()
 
 def _split_text(text, min_length=128):
