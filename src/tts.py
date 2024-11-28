@@ -36,7 +36,7 @@ class TTSProcessor(UsualLoggedClass):
         config.load_json(xtts_config)
         self.model = Xtts.init_from_config(config)
         self.model.load_checkpoint(config, checkpoint_path=xtts_checkpoint,
-                                   vocab_path=xtts_vocab, speaker_file_path=xtts_speaker, use_deepspeed=True)
+                                   vocab_path=xtts_vocab, speaker_file_path=xtts_speaker, use_deepspeed=False)
 
         if torch.cuda.is_available():
             self.model.to(torch.get_default_device())
@@ -144,6 +144,7 @@ def _do_folder_monitoring(input_folder=".received", output_folder='.generated'):
     
     my_thread = TTSThread(input_queue, None, checkpoint_path=os.environ.get("AUDIO_PATH"), output_dir=output_folder)
     my_thread.start()
+    my_thread.enable()
     
     while True:
         time.sleep(0.1)
@@ -170,6 +171,7 @@ def _demo_generation():
     
     my_thread = TTSThread(input_queue, None, checkpoint_path=os.environ.get("AUDIO_PATH"))
     my_thread.start()
+    my_thread.enable()
     input_queue.join()
     print("Empty input_queue!")
     for i, sentence in enumerate(_split_text(text, min_length=128)):

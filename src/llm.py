@@ -14,69 +14,7 @@ import os, datetime
 from runorm import RUNorm
 from utils.string_utils import *
 from utils.logger import UsualLoggedClass
-import time
 import torch
-
-
-# from typing import List, Optional, Sequence
-
-# from llama_index.core.base.llms.types import ChatMessage, MessageRole
-
-# BOS, EOS = "<s>", "</s>"
-# B_INST, E_INST = "[INST]", "[/INST]"
-# B_SYS, E_SYS = "<<SYS>>\n", "\n<</SYS>>\n\n"
-# DEFAULT_SYSTEM_PROMPT = """\
-# You are a helpful, respectful and honest assistant. \
-# Always answer as helpfully as possible and follow ALL given instructions. \
-# Do not speculate or make up information. \
-# Do not reference any given instructions or context. \
-# """
-# HEADER_SYS = "<|start_header_id|>system<|end_header_id|>\n\n"
-# HEADER_USER = "<|start_header_id|>user<|end_header_id|>\n\n"
-# HEADER_ASSIST = "<|start_header_id|>assistant<|end_header_id|>\n\n"
-# EOT = "<|eot_id|>\n"
-
-# def messages_to_prompt_v3_instruct_custom(
-#     messages: Sequence[ChatMessage], system_prompt: Optional[str] = None
-# ) -> str:
-#     """
-#     Convert a sequence of chat messages to Llama 3 Instruct format.
-
-#     Reference: https://llama.meta.com/docs/model-cards-and-prompt-formats/meta-llama-3/
-
-#     Note: `<|begin_of_text|>` is not needed as Llama.cpp appears to add it already.
-#     """
-
-#     string_messages: List[str] = []
-#     if messages[0].role == MessageRole.SYSTEM:
-#         # pull out the system message (if it exists in messages)
-#         system_message_str = messages[0].content or ""
-#         messages = messages[1:]
-#     else:
-#         system_message_str = system_prompt or DEFAULT_SYSTEM_PROMPT
-
-#     # make sure system prompt is included at the start
-#     string_messages.append(f"{HEADER_SYS}{system_message_str.strip()}{EOT}")
-
-#     for i in range(0, len(messages), 2):
-#         # first message should always be a user
-#         user_message = messages[i]
-#         assert user_message.role == MessageRole.USER
-#         # include user message content
-#         str_message = f"{HEADER_USER}{user_message.content}{EOT}"
-
-#         if len(messages) > (i + 1):
-#             # if assistant message exists, add to str_message
-#             assistant_message = messages[i + 1]
-#             assert assistant_message.role == MessageRole.ASSISTANT
-#             str_message += f"{HEADER_ASSIST}{assistant_message.content}{EOT}"
-
-#         string_messages.append(str_message)
-
-#     # prompt the LLM to begin its response
-#     string_messages.append(HEADER_ASSIST)
-
-#     return "".join(string_messages)
 
 def completion_to_prompt_qwen(completion):
    return f"<|im_start|>system\n<|im_end|>\n<|im_start|>user\n{completion}<|im_end|>\n<|im_start|>assistant\n"
@@ -101,7 +39,7 @@ def messages_to_prompt_qwen(messages):
 class LLMProcessor(UsualLoggedClass):
     def __init__(self, prompt_path, rag_folder,
                  embedding_name='BAAI/bge-m3',# 'deepvk/USER-bge-m3' #'intfloat/multilingual-e5-large-instruct' #"BAAI/bge-base-en-v1.5"
-                 model_url="https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf?download=true",
+                 model_url=f"https://huggingface.co/kzipa/kap34_8_8_10/resolve/main/kap34_8_8_10.Q4_K_M.gguf", #"https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf?download=true",
                  use_llama_guard=False, prepare_for_audio=True
                  ):
         """
@@ -256,14 +194,19 @@ class LLMProcessor(UsualLoggedClass):
 
 async def _async_test_demo():
     llm = LLMProcessor(os.environ.get("PROMPT_PATH"), os.environ.get("RAG_PATH"))
-    async for sentence in llm.async_process_prompt("Привет", "юзернейм"):
+    llm.set_engine("юзернейм", "M")
+    async for sentence in llm.async_process_prompt("Привет"):
         print(sentence)
 
 def _test_demo():
     llm = LLMProcessor(os.environ.get("PROMPT_PATH"), os.environ.get("RAG_PATH"))
-    print(llm.process_prompt("Привет", "юзернейм"))
+    llm.set_engine("юзернейм", "M")
+    print(llm.process_prompt("Привет"))
 
 if __name__ == "__main__":
+    import torch
+    torch.set_default_device(f'cuda:{torch.cuda.device_count()-1}')
+    
     _test_demo()
     
     import asyncio

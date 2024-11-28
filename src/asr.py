@@ -10,7 +10,7 @@ class ASRProcessor(UsualLoggedClass):
     def __init__(self, model_id="openai/whisper-large-v3", hf_token=os.environ.get('HF_AUTH'), enhance_input=True) -> None:
         # use this interface to enable\disable logging on application level
         super().__init__()
-        device = "cuda:0" if torch.cuda.is_available() else "cpu"
+        device = torch.get_default_device()
         torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
         model = AutoModelForSpeechSeq2Seq.from_pretrained(
             model_id, torch_dtype=torch_dtype, low_cpu_mem_usage=True, use_safetensors=True,
@@ -82,3 +82,10 @@ class ASRProcessor(UsualLoggedClass):
         torch.set_default_device(default_device)
         print(f'ASR detected: {text}')
         return text
+    
+if __name__ == "__main__":
+    import torch
+    torch.set_default_device(f'cuda:{torch.cuda.device_count()-1}')
+    
+    asr_proc = ASRProcessor()
+    print(asr_proc.get_text("files/name1.wav"))
