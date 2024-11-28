@@ -142,7 +142,7 @@ if __name__ == "__main__":
     dotenv.load_dotenv()
     # allocate last available graphics card as default device
     import torch
-    torch.set_default_device('cuda:1')#f'cuda:{torch.cuda.device_count()-1}')
+    torch.set_default_device(f'cuda:{torch.cuda.device_count()-1}')
     
     from utils.logger import logger
     logger.log_mode = "s"

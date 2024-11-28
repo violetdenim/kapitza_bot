@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04 AS runtime
+FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04 AS runtime
 ARG DEBIAN_FRONTEND=noninteractive
 
 # Uncomment the lines below to use a 3rd party repository
@@ -34,22 +34,32 @@ RUN arch=$(uname -m) && \
     mkdir -p /root/.conda && \
     bash miniconda.sh -b -p /root/miniconda3 && \
     rm -f miniconda.sh
-RUN apt-get update && apt install -y git
+RUN apt-get update && apt install -y git cargo
 RUN conda create -n kap_env python=3.11
 
 # Make RUN commands use the new environment:
 SHELL ["conda", "run", "-n", "kap_env", "/bin/bash", "-c"]
 
 # install torch in the first place (to avoid errors during flash_attn installation)
-RUN pip install torch torchaudio
+RUN pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
 # CMD python -c "import torch; print(torch.cuda.is_available())"
 # RUN pip install -r requirements.txt
-RUN pip install flash_attn python-dotenv python-telegram-bot gitpython runorm
+RUN pip install flash_attn
+RUN pip install python-dotenv python-telegram-bot gitpython
+RUN pip install git+https://github.com/violetdenim/runorm.git
+RUN git clone https://github.com/violetdenim/DeepFilterNet.git && cd DeepFilterNet && pip install maturin poetry && \
+    apt install -y libhdf5-dev && \
+    poetry -C DeepFilterNet install -E train -E eval && \
+    maturin develop --release -m pyDF/Cargo.toml && \
+    export PYTHONPATH=$PWD/DeepFilterNet 
+
+RUN pip install soundfile
+
 RUN pip install llama-index llama-index-embeddings-huggingface 
-RUN pip install --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu121 llama-cpp-python 
+RUN pip install --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu124 llama-cpp-python 
 RUN pip install llama-index-llms-llama_cpp 
 RUN pip install TTS pyannote.audio accelerate
-RUN pip install deepfilternet
+
 RUN pip install huggingface_hub
 RUN DS_BUILD_TRANSFORMER_INFERENCE=1 pip install deepspeed
 COPY . .

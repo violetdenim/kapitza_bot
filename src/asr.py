@@ -40,7 +40,7 @@ class ASRProcessor(UsualLoggedClass):
         self.vad_pipeline.instantiate(HYPER_PARAMETERS)
         # enable sound enhancing
         if enhance_input:
-            self.enhancing_model, self.enhancing_state, _ = init_df() 
+            self.enhancing_model, self.enhancing_state, _, _ = init_df() 
             self.enhancing_rate = self.enhancing_state.sr()
         else:
             self.enhancing_model = None
