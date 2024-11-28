@@ -34,8 +34,10 @@ RUN pip install python-dotenv python-telegram-bot gitpython
 RUN pip install soundfile argparse
 
 RUN pip install git+https://github.com/violetdenim/runorm.git
-RUN git clone https://github.com/violetdenim/DeepFilterNet.git && cd DeepFilterNet && pip install maturin poetry && \
-    apt install -y libhdf5-dev && \
+
+RUN apt update && apt install -y libhdf5-dev
+RUN pip install maturin poetry
+RUN git clone https://github.com/violetdenim/DeepFilterNet.git && cd DeepFilterNet &&  \
     poetry -C DeepFilterNet install -E train -E eval && \
     maturin develop --release -m pyDF/Cargo.toml && \
     export PYTHONPATH=$PWD/DeepFilterNet 
