@@ -1,13 +1,12 @@
-import torch
-import torchaudio
+import torch, torchaudio, os
 from transformers import AutoModelForAudioClassification
 
 # returns F, if woman speaks in audio
 # returns M, if man speaks in audio
-def detect_gender(audio_file, model_path="alefiury/wav2vec2-large-xlsr-53-gender-recognition-librispeech"):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+def detect_gender(audio_file, model_url="alefiury/wav2vec2-large-xlsr-53-gender-recognition-librispeech"):
+    device = torch.get_default_device()
     model = AutoModelForAudioClassification.from_pretrained(
-        pretrained_model_name_or_path=model_path,
+        pretrained_model_name_or_path=model_url,
         num_labels=2,
         label2id={"female": 0, "male": 1},
         id2label={0: "female", 1: "male"}
@@ -16,7 +15,6 @@ def detect_gender(audio_file, model_path="alefiury/wav2vec2-large-xlsr-53-gender
     model.eval()
     data, rate = torchaudio.load(audio_file)
     data = torchaudio.functional.resample(data, rate, 16_000)[0:1, :]
-
 
     len_audio = data.shape[1]
     max_audio_len = 5
@@ -38,6 +36,6 @@ def detect_gender(audio_file, model_path="alefiury/wav2vec2-large-xlsr-53-gender
     return "M" if pred else "F"
 
 if __name__ == "__main__":
-    test_files = ["files/test.wav", "files/name1.m4a", "files/color.m4a", "files/bad_ending1.wav"]
+    test_files = ["files/test.wav", "files/name1.wav", "files/color.wav"]
     for file_name in test_files:
         print(file_name, detect_gender(file_name))
