@@ -138,19 +138,28 @@ class OneThreadProcessor:
                     print(f"Finished cleanup. Resume execution, starting with newuser")
                     self.object_state = 0
 
-if __name__ == "__main__":
+if __name__ == "__main__":    
+    import sys
+    if len(sys.argv) > 1:
+        n_tts = max(1, min(8, int(sys.argv[1])))
+    else:
+        n_tts = 1
+
     dotenv.load_dotenv()
     # allocate last available graphics card as default device
     import torch
-    torch.set_default_device(f'cuda:{torch.cuda.device_count()-1}')
+    #torch.set_default_device(f'cuda:{torch.cuda.device_count()-1}')
+    torch.set_default_device('cuda:0')
+
     
     from utils.logger import logger
     logger.log_mode = "s"
 
     input_folder = ".received"
     output_folder = ".generated"
-    # model_url = "https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf"
-    model_url = f"https://huggingface.co/kzipa/kap34_8_8_10/resolve/main/kap34_8_8_10.Q4_K_M.gguf"
+    os.environ["LLAMA_INDEX_CACHE_DIR"] = "../llama-files"
+    model_url = "https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf"
+    # model_url = f"https://huggingface.co/kzipa/kap34_8_8_10/resolve/main/kap34_8_8_10.Q4_K_M.gguf"
     use_llama_guard = False
 
     for work_dir in [input_folder, output_folder]:
@@ -163,5 +172,5 @@ if __name__ == "__main__":
             os.remove(f)
 
     runnable = OneThreadProcessor(input_folder=input_folder, check_freq=1.0,
-                                  output_folder=output_folder, model_url=model_url, use_llama_guard=use_llama_guard, n_tts=2)
+                                  output_folder=output_folder, model_url=model_url, use_llama_guard=use_llama_guard, n_tts=n_tts)
     asyncio.run(runnable.run())

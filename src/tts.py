@@ -5,10 +5,14 @@ from TTS.tts.configs.xtts_config import XttsConfig
 from TTS.tts.models.xtts import Xtts
 import tempfile
 from git import Repo
-from utils.logger import UsualLoggedClass
+try:
+    from utils.logger import UsualLoggedClass
+except:
+    class UsualLoggedClass: pass
 from queue import Queue
 import threading
-
+import dotenv
+dotenv.load_dotenv()
 
 class TTSProcessor(UsualLoggedClass):
     def __init__(self, checkpoint_path, hf_token=os.environ.get("HF_AUTH"), output_dir='.generated'):
@@ -30,28 +34,27 @@ class TTSProcessor(UsualLoggedClass):
             Repo.clone_from(
                 url=f"https://user:{hf_token}@huggingface.co/kzipa/kapitza_voice", to_path=checkpoint_path)
         assert (os.path.exists(checkpoint_path))
+
         xtts_config, xtts_checkpoint, xtts_vocab, xtts_speaker, speaker_audio_file = files
 
         config = XttsConfig()
         config.load_json(xtts_config)
         self.model = Xtts.init_from_config(config)
+
         self.model.load_checkpoint(config, checkpoint_path=xtts_checkpoint,
                                    vocab_path=xtts_vocab, speaker_file_path=xtts_speaker, use_deepspeed=True)
 
         if torch.cuda.is_available():
             self.model.to(torch.get_default_device())
-        print(f"TTS uses {torch.get_default_device()}")
+        print(f"TTS uses {self.model.device}")
         self.gpt_cond_latent, self.speaker_embedding = self.model.get_conditioning_latents(audio_path=speaker_audio_file,
                                                                                            gpt_cond_len=self.model.config.gpt_cond_len,
                                                                                            max_ref_length=self.model.config.max_ref_len,
                                                                                            sound_norm_refs=True)
-
     def get_audio(self, text, format=".wav", output_name=None):
-        print("get_audio started")
         out = self.model.inference(text=text, language='ru', gpt_cond_latent=self.gpt_cond_latent, speaker_embedding=self.speaker_embedding,
                                    temperature=0.2, repetition_penalty=10.0, top_k=50, top_p=0.85, speed=0.95,
                                    enable_text_splitting=True)
-        print("get_audio finished")
         if output_name is None:
             tmp_filename = next(tempfile._get_candidate_names()) + format
             tmp_filename = os.path.join(self.folder, tmp_filename)
@@ -176,10 +179,6 @@ def _demo_generation():
     my_thread.enable()
     input_queue.join()
     print("Empty input_queue!")
-    for i, sentence in enumerate(_split_text(text, min_length=128)):
-        input_queue.put([sentence, ".wav", f"test_{i}.wav"])
-    input_queue.join()
-    print("Empty input_queue!")
     my_thread.kill()
     
 def _push_files_to_folder(folder=".received"):
@@ -195,7 +194,7 @@ if __name__ == "__main__":
     else:
         mode = 2
     import torch, time
-    torch.set_default_device(f'cuda:{torch.cuda.device_count()-1}')
+    torch.set_default_device('cuda:1')#f'cuda:{torch.cuda.device_count()-1}')
     
     match mode:
         case 0: _do_folder_monitoring()

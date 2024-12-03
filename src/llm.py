@@ -106,7 +106,7 @@ class LLMProcessor(UsualLoggedClass):
         if prepare_for_audio:
             self.normalizer = RUNorm()
             self.normalizer.load(model_size="big", device=self.device)
-            self.postprocessing_fn = lambda x: self.normalizer.norm(drop_ending(strip_substr(x, ['assistant', ' ', '\n']).replace("Вы welcome", "Пожалуйста")))
+            self.postprocessing_fn = lambda x: self.normalizer.norm(drop_ending(strip_substr(x, ['assistant', ' ', '\n']).replace("Вы welcome", "Пожалуйста"))).replace('[-]', '')
         else:
             self.postprocessing_fn = lambda x: drop_ending(strip_substr(x, ['assistant', ' ', '\n']).replace("Вы welcome", "Пожалуйста"))
         if self.use_llama_guard:
