@@ -18,7 +18,7 @@ class OneThreadProcessor:
     async def process_newuser_file(self, target_name):
         assert(self.object_state == 0)
         self.object_state = 1
-        self.processor.tts.engine.get_audio("Здравствуйте! Я ИИ-двойник Сергея Капицы. Для удобства можете обращаться ко мне Сергей Петрович.", output_name=target_name)
+        self.processor.tts.engine.get_audio("Здравствуйте! Я цифровой двойник Сергея Капиитсы. Для удобства можете обращаться ко мне Сергей Петрович. Представьтесь, пожалуйста.", output_name=target_name)
         
     async def process_username(self, input_file_name, target_name):
         assert(self.object_state == 1)

@@ -119,15 +119,15 @@ class LLMProcessor(UsualLoggedClass):
 
     def postprocessing_fn(self, input_str: str):
         processed_str = drop_ending(strip_substr(input_str, ['assistant', ' ', '\n']))
-        replacements = {"Вы welcome": "Пожалуйста", "Капиц": "Капитс"}
+        replacements = {"Вы welcome": "Пожалуйста", "Капиц": "Капиитс"}
         for k, v in replacements.items():
             processed_str = processed_str.replace(k, v)
 
         if self.prepare_for_audio:
             processed_str = self.normalizer.norm(processed_str)
         
-        processed_str = re.sub(r"[ ]+\([ a-zA-Z0–9]+\)[ ]+", "", processed_str)
-        processed_str = re.sub(r"[ ]+\[[ a-zA-Z0–9]+\][ ]+", "", processed_str)
+        processed_str = re.sub(r"[ ]+\([ а-яА-Яa-zA-Z0–9]+\)[ ]+", "", processed_str)
+        processed_str = re.sub(r"[ ]+\[[ а-яА-Яa-zA-Z0–9]+\][ ]+", "", processed_str)
 
         return processed_str
 
