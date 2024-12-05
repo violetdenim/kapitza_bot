@@ -278,9 +278,11 @@ async def _interactive_demo(use_questions=False, output_mode="text"):
     # model_url = "https://huggingface.co/QuantFactory/suzume-llama-3-8B-multilingual-GGUF/resolve/main/suzume-llama-3-8B-multilingual.Q4_K_M.gguf?download=true"
     # model_url = 'https://huggingface.co/QuantFactory/Meta-Llama-3-70B-Instruct-GGUF-v2/resolve/main/Meta-Llama-3-70B-Instruct-v2.Q4_K_M.gguf?download=true'
     # model_url = "https://huggingface.co/QuantFactory/Qwen2.5-14B-Instruct-GGUF/resolve/main/Qwen2.5-14B-Instruct.Q4_K_M.gguf?download=true"
-    quant = "Q4_K_M" # "BF16"#
-    model_url=f"https://huggingface.co/kzipa/kap34_8_8_10/resolve/main/kap34_8_8_10.{quant}.gguf?download=true"
+    # quant = "Q4_K_M" # "BF16"#
+    # model_url=f"https://huggingface.co/kzipa/kap34_8_8_10/resolve/main/kap34_8_8_10.{quant}.gguf?download=true"
 
+    model_url = "https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf"
+    
     # model_url = "unsloth/Llama-3.2-11B-Vision-Instruct"
     
     pipe = Pipeline(model_url=model_url, use_llama_guard=False, prepare_for_audio=(output_mode != "text") )

@@ -59,20 +59,20 @@ class OneThreadProcessor:
             user_answer = user_answer.strip(".,! ").capitalize()
             meaningful = sum(1 for c in user_answer if ord('a') <= ord(c) <= ord('z') or ord('A') <= ord(c) <= ord('Z') or ord('а') <= ord(c) <= ord('я') or ord('А') <= ord(c) <= ord('Я'))
             if meaningful < 3:
-                username = None
-                usergender = None
-                self.object_state = 1
+                username = "Дорогой друг"
+                usergender = "M"
+                # self.object_state = 1
             else:
                 username = user_answer
                 if _ext != ".txt":
                     usergender = detect_gender(input_file_name)
                 else:
                     usergender = 'F'
-                print(f"User name: {username}")
-                print(f"User gender: {usergender}")
+            print(f"User name: {username}")
+            print(f"User gender: {usergender}")
 
-                self.processor.set_user(username, usergender)
-                self.processor.tts.engine.get_audio(f"{username}, приятно познакомиться", output_name=target_name)
+            self.processor.set_user(username, usergender)
+            self.processor.tts.engine.get_audio(f"{username}, приятно познакомиться", output_name=target_name)
         
     async def process_request(self, input_file_name, target_name):
         assert(self.object_state == 0)
