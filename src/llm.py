@@ -53,7 +53,7 @@ class LLMProcessor(UsualLoggedClass):
         super().__init__()
         self.device = torch.get_default_device()
         documents = SimpleDirectoryReader(rag_folder, recursive=True).load_data() # "data"
-        print(documents)
+        # print(documents)
         Settings.embed_model = HuggingFaceEmbedding(model_name=embedding_name, device=self.device)
         is_gguf = '.gguf' in model_url
         if not model_url.startswith("http"):
