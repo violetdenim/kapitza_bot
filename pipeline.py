@@ -93,6 +93,7 @@ class Pipeline(UsualLoggedClass):
         for i in range(1, self.n_tts):
             self.ttses[i].disable()
         async for sentence in self.llm.async_process_prompt(user_message):
+            print(f"Got sentence: {sentence}")
             meaningful = sum(1 for c in sentence if ord('a') <= ord(c) <= ord('z') or ord('A') <= ord(c) <= ord('Z') or ord('а') <= ord(c) <= ord('я') or ord('А') <= ord(c) <= ord('Я'))
             if meaningful == 0:
                 continue # skip current iteration
