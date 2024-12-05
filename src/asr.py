@@ -7,7 +7,7 @@ try:
     from utils.logger import UsualLoggedClass
 except:
     class UsualLoggedClass: pass
-from enhancer import Enhancer
+from src.enhancer import Enhancer
 
 class ASRProcessor(UsualLoggedClass):
     def __init__(self, model_id="openai/whisper-large-v3", hf_token=os.environ.get('HF_AUTH'), enhancer: Enhancer = None) -> None:

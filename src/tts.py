@@ -14,7 +14,7 @@ import threading
 import dotenv
 dotenv.load_dotenv()
 
-from enhancer import Enhancer
+from src.enhancer import Enhancer
 
 class TTSProcessor(UsualLoggedClass):
     def __init__(self, checkpoint_path, hf_token=os.environ.get("HF_AUTH"), output_dir='.generated', enhancer: Enhancer=None):
