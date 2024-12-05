@@ -5,6 +5,7 @@ import torchaudio, torch
 from src.llm import LLMProcessor
 from src.tts import TTSProcessor, TTSThread
 from src.asr import ASRProcessor
+from src.enhancer import Enhancer
 from utils.logger import UsualLoggedClass 
 from queue import Queue
 
@@ -22,10 +23,12 @@ class Pipeline(UsualLoggedClass):
         hf_token = os.environ.get('HF_AUTH')
         self.n_tts = n_tts
         if prepare_for_audio:
-            self.asr = ASRProcessor(hf_token=hf_token)
+            enhancer = Enhancer()
+            self.asr = ASRProcessor(hf_token=hf_token, enhancer=enhancer)
             self.queue = Queue()
             self.o_queue = Queue()
-            self.ttses = [TTSThread(self.queue, self.o_queue, checkpoint_path=os.environ.get("AUDIO_PATH"), hf_token=hf_token, output_dir=output_folder)
+            self.ttses = [TTSThread(self.queue, self.o_queue, checkpoint_path=os.environ.get("AUDIO_PATH"), \
+                                    hf_token=hf_token, output_dir=output_folder, enhancer=enhancer)
                           for i in range(self.n_tts)]   
             for i in range(self.n_tts):
                 self.ttses[i].start() # run in separate thread

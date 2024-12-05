@@ -14,8 +14,10 @@ import threading
 import dotenv
 dotenv.load_dotenv()
 
+from enhancer import Enhancer
+
 class TTSProcessor(UsualLoggedClass):
-    def __init__(self, checkpoint_path, hf_token=os.environ.get("HF_AUTH"), output_dir='.generated'):
+    def __init__(self, checkpoint_path, hf_token=os.environ.get("HF_AUTH"), output_dir='.generated', enhancer: Enhancer=None):
         super().__init__()
         self.folder = output_dir
         if os.path.exists(self.folder):
@@ -46,11 +48,12 @@ class TTSProcessor(UsualLoggedClass):
 
         if torch.cuda.is_available():
             self.model.to(torch.get_default_device())
-        print(f"TTS uses {self.model.device}")
         self.gpt_cond_latent, self.speaker_embedding = self.model.get_conditioning_latents(audio_path=speaker_audio_file,
                                                                                            gpt_cond_len=self.model.config.gpt_cond_len,
                                                                                            max_ref_length=self.model.config.max_ref_len,
                                                                                            sound_norm_refs=True)
+        self.enhancer = enhancer
+
     def get_audio(self, text, format=".wav", output_name=None):
         out = self.model.inference(text=text, language='ru', gpt_cond_latent=self.gpt_cond_latent, speaker_embedding=self.speaker_embedding,
                                    temperature=0.2, repetition_penalty=10.0, top_k=50, top_p=0.85, speed=0.95,
@@ -62,11 +65,12 @@ class TTSProcessor(UsualLoggedClass):
             tmp_filename = output_name
         # modified bits_per_sample for LipSync
         # modified frame rate for offline lipsync
-        wave = torch.tensor(out["wav"]).unsqueeze(0)
-        wave = torchaudio.functional.resample(wave, 24_000, 16_000)
-        print(f"Saving {tmp_filename}")
+        wave, sr = torch.tensor(out["wav"]).unsqueeze(0), 24_000
+        if self.enhancer:
+            wave, sr = self.enhancer.enhance(wave, sr)
+        if sr != 16_000:
+            wave = torchaudio.functional.resample(wave, sr, 16_000)
         torchaudio.save(tmp_filename, wave.cpu(), 16_000, encoding="PCM_S", backend="soundfile", bits_per_sample=16)
-        print(f"{tmp_filename} saved")
         return tmp_filename
 
 
@@ -74,14 +78,17 @@ class TTSProcessor(UsualLoggedClass):
 class TTSThread(threading.Thread):
     """ Thread accepts audio files using socket and puts their names into queue"""
     def __init__(self, input: Queue, output: Queue, **params):
+        self.device = torch.get_default_device()
         threading.Thread.__init__(self)
         self.input = input
         self.engine = TTSProcessor(**params)
         self.output = output
         self._kill = threading.Event()
         self._enabled = threading.Event()
+        
 
     def run(self):
+        torch.set_default_device(self.device)
         while True:
             if self._kill.wait(0.05):
                 print("Killing TTSThread: kill signal")
@@ -113,11 +120,9 @@ class TTSThread(threading.Thread):
         self._kill.set()
     
     def enable(self):
-        print('TTSThread enabled')
         self._enabled.set()
     
     def disable(self):
-        print('TTSThread disabled')
         self._enabled.clear()
 
 def _split_text(text, min_length=128):
@@ -167,14 +172,17 @@ def _do_folder_monitoring(input_folder=".received", output_folder='.generated'):
                         input_queue.put([sentence, ".wav", f"{name}_{i}.wav"])
                 os.remove(input_file_name)
 
-def _demo_generation():
-    text = """Hello Science News Explores readers! I am a digital clone of Sergey Kapiitsa. He was a famous scientist who passed away in two thousand twelve. Now, artificial intelligence has made it possible to mimic his voice and likeness."""
+def _demo_generation(text = """ \
+        Hello Science News Explores readers! I am a digital clone of Sergey Kapiitsa. \
+        He was a famous scientist who passed away in two thousand twelve. \
+        Now, artificial intelligence has made it possible to mimic his voice and likeness. \
+        """, enhance=False):
     input_queue = Queue()
     for i, sentence in enumerate(_split_text(text, min_length=128)):
         input_queue.put([sentence, ".wav", f"test_{i}.wav"])
     # input_queue.put(9)
     
-    my_thread = TTSThread(input_queue, None, checkpoint_path=os.environ.get("AUDIO_PATH"))
+    my_thread = TTSThread(input_queue, None, checkpoint_path=os.environ.get("AUDIO_PATH"), enhancer=Enhancer() if enhance else None)
     my_thread.start()
     my_thread.enable()
     input_queue.join()
@@ -194,12 +202,12 @@ if __name__ == "__main__":
     else:
         mode = 2
     import torch, time
-    torch.set_default_device('cuda:1')#f'cuda:{torch.cuda.device_count()-1}')
+    torch.set_default_device(f'cuda:{torch.cuda.device_count()-1}')
     
     match mode:
         case 0: _do_folder_monitoring()
         case 1: _push_files_to_folder()
-        case 2: t = time.time_ns();_demo_generation(); print((time.time_ns() - t)//1000.000/1000, " s")
+        case 2: t = time.time_ns(); _demo_generation(text="Здравствуйте! Я цифровой аватар Сергея Капитсы. Для удобства можете обращаться ко мне Сергей Петрович.", enhance=True); print((time.time_ns() - t)//1000.000/1000, " s")
     
     
     

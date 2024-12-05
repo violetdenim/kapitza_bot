@@ -12,9 +12,40 @@ from llama_index.llms.llama_cpp.llama_utils import ( messages_to_prompt_v3_instr
 import os, datetime
 # tool to normalize model's output
 from runorm import RUNorm
-from utils.string_utils import *
-from utils.logger import UsualLoggedClass
-import torch
+# from utils.string_utils import *
+
+"""
+Helper functions for string processing etc.
+"""
+
+def strip_substr(text, sub_strings):
+    n = len(text)
+    n_old = n + 1
+    while n < n_old:
+        for substr in sub_strings:
+            text = text.strip(substr)
+        n, n_old = len(text), n
+    return text
+
+def drop_ending(some_text, endings='.!?'):
+    p = len(some_text) - 1
+    while p >= 0 and some_text == ' ':
+        p -= 1
+    if p < 0 or some_text[p] in endings:
+        return some_text[:p+1]
+    while p >= 0 and some_text[p] not in endings:
+        p -= 1
+    if p < 0:
+        return ""
+    return some_text[:p+1]
+
+
+try:
+    from utils.logger import UsualLoggedClass
+except:
+    class UsualLoggedClass: pass
+
+import torch, re
 
 def completion_to_prompt_qwen(completion):
    return f"<|im_start|>system\n<|im_end|>\n<|im_start|>user\n{completion}<|im_end|>\n<|im_start|>assistant\n"
@@ -92,7 +123,6 @@ class LLMProcessor(UsualLoggedClass):
             )
         # Set the size of the text chunk for retrieval
         Settings.transformations = [SentenceSplitter(chunk_size=1024)]
-
         
         self.index = VectorStoreIndex.from_documents(documents)
         self.chat_store = None
@@ -102,19 +132,30 @@ class LLMProcessor(UsualLoggedClass):
         self.prompt_path = prompt_path
         
         self.use_llama_guard = use_llama_guard
-        
+        self.prepare_for_audio = prepare_for_audio
         if prepare_for_audio:
             self.normalizer = RUNorm()
             self.normalizer.load(model_size="big", device=self.device)
-            self.postprocessing_fn = lambda x: self.normalizer.norm(drop_ending(strip_substr(x, ['assistant', ' ', '\n']).replace("Вы welcome", "Пожалуйста"))).replace('[-]', '')
-        else:
-            self.postprocessing_fn = lambda x: drop_ending(strip_substr(x, ['assistant', ' ', '\n']).replace("Вы welcome", "Пожалуйста"))
         if self.use_llama_guard:
             from llama_index.core.llama_pack import download_llama_pack
             LlamaGuardModeratorPack = download_llama_pack("LlamaGuardModeratorPack")#, "../llamaguard_pack")
             self.llamaguard_pack = LlamaGuardModeratorPack()
         else:
             self.llamaguard_pack = None
+
+    def postprocessing_fn(self, input_str: str):
+        processed_str = drop_ending(strip_substr(input_str, ['assistant', ' ', '\n']))
+        replacements = {"Вы welcome": "Пожалуйста", "Капиц": "Капитс"}
+        for k, v in replacements.items():
+            processed_str = processed_str.replace(k, v)
+
+        if self.prepare_for_audio:
+            processed_str = self.normalizer.norm(processed_str)
+        
+        processed_str = re.sub(r"[ ]+\([ a-zA-Z0–9]+\)[ ]+", "", processed_str)
+        processed_str = re.sub(r"[ ]+\[[ a-zA-Z0–9]+\][ ]+", "", processed_str)
+
+        return processed_str
 
     def get_system_prompt(self, user_name, user_gender="F"):
         with open(self.prompt_path, "r", encoding='utf-8') as f:

@@ -3,11 +3,14 @@ from pyannote.audio import Model as VADModel
 from pyannote.audio.pipelines import VoiceActivityDetection
 import torch, torchaudio, os
 import time
-from utils.logger import UsualLoggedClass
-from df.enhance import enhance, init_df
+try:
+    from utils.logger import UsualLoggedClass
+except:
+    class UsualLoggedClass: pass
+from enhancer import Enhancer
 
 class ASRProcessor(UsualLoggedClass):
-    def __init__(self, model_id="openai/whisper-large-v3", hf_token=os.environ.get('HF_AUTH'), enhance_input=True) -> None:
+    def __init__(self, model_id="openai/whisper-large-v3", hf_token=os.environ.get('HF_AUTH'), enhancer: Enhancer = None) -> None:
         # use this interface to enable\disable logging on application level
         super().__init__()
         device = torch.get_default_device()
@@ -39,12 +42,9 @@ class ASRProcessor(UsualLoggedClass):
         }
         self.vad_pipeline.instantiate(HYPER_PARAMETERS)
         # enable sound enhancing
-        if enhance_input:
-            self.enhancing_model, self.enhancing_state, _, _ = init_df() 
-            self.enhancing_rate = self.enhancing_state.sr()
-        else:
-            self.enhancing_model = None
-        
+        self.enhancer = enhancer
+
+       
     def get_text(self, audio_file):
         load_attempts_count = 5
         sleeping_period = 3.0
@@ -62,11 +62,8 @@ class ASRProcessor(UsualLoggedClass):
                     return None
         default_device = torch.get_default_device()
         
-        if self.enhancing_model is not None:
-            if sr != self.enhancing_rate:
-                audio = torchaudio.functional.resample(audio, sr, self.enhancing_rate)
-            audio = enhance(self.enhancing_model, self.enhancing_state, audio.to(default_device))
-            sr = self.enhancing_rate
+        if self.enhancer is not None:
+            audio, sr = self.enhancer.enhance(audio, sr)
         
         rate = 16_000
         if sr != rate:
