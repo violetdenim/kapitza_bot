@@ -13,7 +13,11 @@ try:
     from src.enhancer import Enhancer
 except:
     from enhancer import Enhancer
-
+try:
+    import deepspeed
+    HAS_DEEPSPEED = True
+except:
+    HAS_DEEPSPEED = False
 
 from queue import Queue
 import threading
@@ -49,7 +53,7 @@ class TTSProcessor(UsualLoggedClass):
         self.model = Xtts.init_from_config(config)
 
         self.model.load_checkpoint(config, checkpoint_path=xtts_checkpoint,
-                                   vocab_path=xtts_vocab, speaker_file_path=xtts_speaker, use_deepspeed=True)
+                                   vocab_path=xtts_vocab, speaker_file_path=xtts_speaker, use_deepspeed=HAS_DEEPSPEED)
 
         if torch.cuda.is_available():
             self.model.to(torch.get_default_device())
@@ -258,7 +262,7 @@ if __name__ == "__main__":
     else:
         mode = 3
     import torch, time
-    torch.set_default_device(f'cuda:{torch.cuda.device_count()-1}')
+    torch.set_default_device(f'cuda:0')
     
     match mode:
         case 0: _do_folder_monitoring()
