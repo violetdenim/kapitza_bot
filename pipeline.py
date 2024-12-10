@@ -24,7 +24,7 @@ class Pipeline(UsualLoggedClass):
         self.n_tts = n_tts
         if prepare_for_audio:
             enhancer = Enhancer()
-            self.asr = ASRProcessor(hf_token=hf_token, enhancer=enhancer)
+            self.asr = ASRProcessor(hf_token=hf_token, enhancer=None)
             self.queue = Queue()
             self.o_queue = Queue()
             self.ttses = [TTSThread(self.queue, self.o_queue, checkpoint_path=os.environ.get("AUDIO_PATH"), \
