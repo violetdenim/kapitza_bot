@@ -75,8 +75,7 @@ class TTSProcessor(UsualLoggedClass):
     
     def get_stream_audio(self, text, output_name, start_index=0):
         for i, out in enumerate(self.model.inference_stream(text=text, language='ru', gpt_cond_latent=self.gpt_cond_latent, speaker_embedding=self.speaker_embedding,
-                                   temperature=0.2, repetition_penalty=10.0, top_k=50, top_p=0.85, speed=0.95,
-                                   enable_text_splitting=True)):
+                                   temperature=0.2, repetition_penalty=10.0, top_k=50, top_p=0.85, speed=0.95, enable_text_splitting=True)):
             # modified bits_per_sample for LipSync
             # modified frame rate for offline lipsync
             wave, sr = out.unsqueeze(0), 24_000
@@ -114,21 +113,32 @@ class TTSThread(threading.Thread):
                     self.input.task_done()
                     print("Killing TTSThread: end of queue")
                     return
-
                 assert(isinstance(package, tuple) or isinstance(package, list))
-                assert(len(package) == 3)    
-                text, format, output_name = package
-                if format != "":
-                    result = self.engine.get_audio(text=text, format=format, output_name=output_name)
+                assert((len(package) == 3) or (len(package) == 4))    
+                if len(package) == 3:    
+                    text, format, output_name = package
+                    do_stream = False
                 else:
+                    text, format, output_name, start_index = package
+                    do_stream = True
+                if format == "":
                     end_marker = os.path.join(self.engine.folder, output_name)
                     # write 'done' marker
                     print(f"Saving {end_marker}")
                     with open(end_marker, 'w') as m:
                         m.write('')
                     result = output_name
-                if self.output:
-                    self.output.put(result)
+                    if self.output:
+                        self.output.put(result)
+                else:
+                    if not do_stream:
+                        result = self.engine.get_audio(text=text, format=format, output_name=output_name)
+                        if self.output:
+                            self.output.put(result)
+                    else:
+                        for result in self.engine.get_stream_audio(text=text, output_name=output_name, start_index=start_index):
+                            if self.output:
+                                self.output.put(result)
                 self.input.task_done()
             
     def kill(self):
