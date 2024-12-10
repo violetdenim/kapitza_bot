@@ -9,12 +9,17 @@ try:
     from utils.logger import UsualLoggedClass
 except:
     class UsualLoggedClass: pass
+try:
+    from src.enhancer import Enhancer
+except:
+    from enhancer import Enhancer
+
+
 from queue import Queue
 import threading
 import dotenv
 dotenv.load_dotenv()
 
-from src.enhancer import Enhancer
 
 class TTSProcessor(UsualLoggedClass):
     def __init__(self, checkpoint_path, hf_token=os.environ.get("HF_AUTH"), output_dir='.generated', enhancer: Enhancer=None):
@@ -53,6 +58,8 @@ class TTSProcessor(UsualLoggedClass):
                                                                                            max_ref_length=self.model.config.max_ref_len,
                                                                                            sound_norm_refs=True)
         self.enhancer = enhancer
+        self.last_name = None
+        self.last_index = 0
 
     def get_audio(self, text, format=".wav", output_name=None):
         out = self.model.inference(text=text, language='ru', gpt_cond_latent=self.gpt_cond_latent, speaker_embedding=self.speaker_embedding,
@@ -73,9 +80,14 @@ class TTSProcessor(UsualLoggedClass):
         torchaudio.save(tmp_filename, wave.cpu(), 16_000, encoding="PCM_S", backend="soundfile", bits_per_sample=16)
         return tmp_filename
     
-    def get_stream_audio(self, text, output_name, start_index=0):
-        for i, out in enumerate(self.model.inference_stream(text=text, language='ru', gpt_cond_latent=self.gpt_cond_latent, speaker_embedding=self.speaker_embedding,
-                                   temperature=0.2, repetition_penalty=10.0, top_k=50, top_p=0.85, speed=0.95, enable_text_splitting=True)):
+    def get_stream_audio(self, text, output_name):
+        root_name = os.path.splitext(output_name)[0]
+        if self.last_name != root_name:
+            self.last_name = root_name
+            self.last_index = 0
+
+        for out in self.model.inference_stream(text=text, language='ru', gpt_cond_latent=self.gpt_cond_latent, speaker_embedding=self.speaker_embedding,
+                                   temperature=0.2, repetition_penalty=10.0, top_k=50, top_p=0.85, speed=0.95, enable_text_splitting=True):
             # modified bits_per_sample for LipSync
             # modified frame rate for offline lipsync
             wave, sr = out.unsqueeze(0), 24_000
@@ -83,9 +95,11 @@ class TTSProcessor(UsualLoggedClass):
                 wave, sr = self.enhancer.enhance(wave, sr)
             if sr != 16_000:
                 wave = torchaudio.functional.resample(wave, sr, 16_000)
-            name = f"{output_name}_{start_index+i}.wav"
-            torchaudio.save(name, wave.cpu(), 16_000, encoding="PCM_S", backend="soundfile", bits_per_sample=16)
-            yield name
+
+            chunk_name = f"{root_name}_{self.last_index}.wav"
+            torchaudio.save(chunk_name, wave.cpu(), 16_000, encoding="PCM_S", backend="soundfile", bits_per_sample=16)
+            self.last_index += 1
+            yield chunk_name
 
 
 # retrieves sentences from one queue and pushes audio into another
@@ -114,14 +128,14 @@ class TTSThread(threading.Thread):
                     print("Killing TTSThread: end of queue")
                     return
                 assert(isinstance(package, tuple) or isinstance(package, list))
-                assert((len(package) == 3) or (len(package) == 4))    
+                assert((len(package) == 3) or (len(package) == 2))    
                 if len(package) == 3:    
                     text, format, output_name = package
                     do_stream = False
                 else:
-                    text, format, output_name, start_index = package
+                    text, output_name = package
                     do_stream = True
-                if format == "":
+                if package[1] == "":
                     end_marker = os.path.join(self.engine.folder, output_name)
                     # write 'done' marker
                     print(f"Saving {end_marker}")
@@ -136,7 +150,7 @@ class TTSThread(threading.Thread):
                         if self.output:
                             self.output.put(result)
                     else:
-                        for result in self.engine.get_stream_audio(text=text, output_name=output_name, start_index=start_index):
+                        for result in self.engine.get_stream_audio(text=text, output_name=output_name):
                             if self.output:
                                 self.output.put(result)
                 self.input.task_done()
@@ -213,6 +227,23 @@ def _demo_generation(text = """ \
     input_queue.join()
     print("Empty input_queue!")
     my_thread.kill()
+
+def _demo_generation_streaming(text = """ \
+        Hello Science News Explores readers! I am a digital clone of Sergey Kapiitsa. \
+        He was a famous scientist who passed away in two thousand twelve. \
+        Now, artificial intelligence has made it possible to mimic his voice and likeness. \
+        """, enhance=False):
+    input_queue = Queue()
+    for i, sentence in enumerate(_split_text(text, min_length=128)):
+        input_queue.put([sentence, f"test.wav"])
+    # input_queue.put(9)
+    
+    my_thread = TTSThread(input_queue, None, checkpoint_path=os.environ.get("AUDIO_PATH"), enhancer=Enhancer() if enhance else None)
+    my_thread.start()
+    my_thread.enable()
+    input_queue.join()
+    print("Empty input_queue!")
+    my_thread.kill()
     
 def _push_files_to_folder(folder=".received"):
     os.makedirs(folder, 0o777, True)
@@ -225,7 +256,7 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         mode = int(sys.argv[1])
     else:
-        mode = 2
+        mode = 3
     import torch, time
     torch.set_default_device(f'cuda:{torch.cuda.device_count()-1}')
     
@@ -233,7 +264,5 @@ if __name__ == "__main__":
         case 0: _do_folder_monitoring()
         case 1: _push_files_to_folder()
         case 2: t = time.time_ns(); _demo_generation(text="Здравствуйте! Я цифровой аватар Сергея Капитсы. Для удобства можете обращаться ко мне Сергей Петрович.", enhance=True); print((time.time_ns() - t)//1000.000/1000, " s")
-    
-    
-    
-    
+        case 3: t = time.time_ns(); _demo_generation_streaming(text="Здравствуйте! Я цифровой аватар Сергея Капитсы. Для удобства можете обращаться ко мне Сергей Петрович.", enhance=True); print((time.time_ns() - t)//1000.000/1000, " s")
+
