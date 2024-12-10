@@ -72,6 +72,21 @@ class TTSProcessor(UsualLoggedClass):
             wave = torchaudio.functional.resample(wave, sr, 16_000)
         torchaudio.save(tmp_filename, wave.cpu(), 16_000, encoding="PCM_S", backend="soundfile", bits_per_sample=16)
         return tmp_filename
+    
+    def get_stream_audio(self, text, output_name, start_index=0):
+        for i, out in enumerate(self.model.inference_stream(text=text, language='ru', gpt_cond_latent=self.gpt_cond_latent, speaker_embedding=self.speaker_embedding,
+                                   temperature=0.2, repetition_penalty=10.0, top_k=50, top_p=0.85, speed=0.95,
+                                   enable_text_splitting=True)):
+            # modified bits_per_sample for LipSync
+            # modified frame rate for offline lipsync
+            wave, sr = out.unsqueeze(0), 24_000
+            if self.enhancer:
+                wave, sr = self.enhancer.enhance(wave, sr)
+            if sr != 16_000:
+                wave = torchaudio.functional.resample(wave, sr, 16_000)
+            name = f"{output_name}_{start_index+i}.wav"
+            torchaudio.save(name, wave.cpu(), 16_000, encoding="PCM_S", backend="soundfile", bits_per_sample=16)
+            yield name
 
 
 # retrieves sentences from one queue and pushes audio into another
