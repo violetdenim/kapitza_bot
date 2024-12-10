@@ -177,5 +177,6 @@ if __name__ == "__main__":
             os.remove(f)
 
     runnable = OneThreadProcessor(input_folder=input_folder, check_freq=1.0,
-                                  output_folder=output_folder, model_url=model_url, use_llama_guard=use_llama_guard, n_tts=n_tts)
+                                  output_folder=output_folder, model_url=model_url, use_llama_guard=use_llama_guard, n_tts=n_tts,
+                                  stream_audio=True)
     asyncio.run(runnable.run())

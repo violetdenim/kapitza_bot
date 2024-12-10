@@ -13,15 +13,12 @@ from queue import Queue
 dotenv.load_dotenv()
 
 class Pipeline(UsualLoggedClass):
-    def __init__(self,
-                 model_url=f"https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf",
-                 use_llama_guard=False,
-                 output_folder=".generated",
-                 prepare_for_audio=True,
-                 n_tts=4):
+    def __init__(self, model_url=f"https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf",
+                 use_llama_guard=False, output_folder=".generated", prepare_for_audio=True, n_tts=4, stream_audio=False):
         # model_url = "https://huggingface.co/QuantFactory/Meta-Llama-3.1-8B-GGUF/resolve/main/Meta-Llama-3.1-8B.Q4_K_M.gguf?download=true"
         hf_token = os.environ.get('HF_AUTH')
         self.n_tts = n_tts
+        self.stream_audio = stream_audio
         if prepare_for_audio:
             enhancer = Enhancer()
             self.asr = ASRProcessor(hf_token=hf_token, enhancer=None)
@@ -37,8 +34,8 @@ class Pipeline(UsualLoggedClass):
             self.ttses = [None for _ in range(self.n_tts)]
             self.queue = None
 
-        self.llm = LLMProcessor(os.environ.get("PROMPT_PATH"), os.environ.get("RAG_PATH"),
-                model_url=model_url, use_llama_guard=use_llama_guard, prepare_for_audio=prepare_for_audio)
+        self.llm = LLMProcessor(os.environ.get("PROMPT_PATH"), os.environ.get("RAG_PATH"), model_url=model_url, \
+                                use_llama_guard=use_llama_guard, prepare_for_audio=prepare_for_audio)
         
         super().__init__()
         
@@ -76,6 +73,7 @@ class Pipeline(UsualLoggedClass):
                 name, ext = os.path.splitext(output_name)
                 iteration_name = name + "_" + str(index) + ext
             return iteration_name
+        
         if user_message is None and self.asr:
             user_message = self.asr.get_text(file_to_process)
         if user_message is None: # invalid input path, just skip
@@ -109,7 +107,10 @@ class Pipeline(UsualLoggedClass):
                 else:
                     if len(audio_block):
                         print(f"Generating audio for text `{audio_block}`")
-                        self.queue.put([audio_block, ".wav" if output_mode == "audio" else ".ogg", construct_name(output_name, index)])
+                        if not self.stream_audio:
+                            self.queue.put([audio_block, ".wav" if output_mode == "audio" else ".ogg", construct_name(output_name, index)])
+                        else:
+                            self.queue.put([audio_block, output_name])
                         # yield None # do nothing, second process will do generation and put it to folder
                         # yielding will be done later
                         index += 1
@@ -124,7 +125,10 @@ class Pipeline(UsualLoggedClass):
                 pass
         if len(audio_block):
             print(f"Generating audio for text `{audio_block}`")
-            self.queue.put([audio_block, ".wav" if output_mode == "audio" else ".ogg", construct_name(output_name, index)])
+            if not self.stream_audio:
+                self.queue.put([audio_block, ".wav" if output_mode == "audio" else ".ogg", construct_name(output_name, index)])
+            else:
+                self.queue.put([audio_block, output_name])
             n_outputs += 1
         # enable all tts
         for i in range(self.n_tts):
@@ -133,9 +137,14 @@ class Pipeline(UsualLoggedClass):
         # wait for all queues to finish and write to output `done`
         self.queue.join()
         # if something wasn't finished until this moment, it will be passed later
-        while n_outputs: 
-            yield self.o_queue.get() # yield other ready results
-            n_outputs -= 1
+        # while n_outputs: 
+        #     yield self.o_queue.get() # yield other ready results
+        #     n_outputs -= 1
+        while True: 
+            try:
+                yield self.o_queue.get(block=False) # yield other ready results
+            except:
+                break
             
         # write 'done' marker to output folder
         end_marker = os.path.join(self.tts.engine.folder, 'done')
